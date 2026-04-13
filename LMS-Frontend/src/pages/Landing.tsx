@@ -6,12 +6,11 @@ import {
   Video, Award, Globe,
   Users,
   ArrowRight, Play, GraduationCap,
-  Lightbulb
+  Lightbulb, BookOpen, Star, Clock, CheckCircle
 } from 'lucide-react'
 import Button from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { Accordion } from '../components/ui/Accordion'
-import heroImage from '../assets/hero.png'
 import { getPlatformStats } from '../services/tutorsApi'
 
 const Landing = () => {
@@ -104,12 +103,64 @@ const Landing = () => {
               transition={{ duration: 0.6, delay: 0.2 }}
               className="relative"
             >
-              <div className="relative">
-                <img
-                  src={heroImage}
-                  alt="LiveExpert.AI - Smart Learning Platform"
-                  className="w-full h-auto rounded-2xl shadow-2xl object-cover"
-                />
+              <div className="relative bg-gradient-to-br from-primary-50 to-secondary-50 rounded-2xl shadow-2xl p-6 border border-primary-100">
+                {/* Course Card */}
+                <div className="bg-white rounded-xl shadow-md p-5 mb-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-lg bg-primary-100 flex items-center justify-center">
+                      <BookOpen className="w-5 h-5 text-primary-600" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900 text-sm">Live 1-on-1 Session</p>
+                      <p className="text-xs text-gray-500">with Expert Tutor</p>
+                    </div>
+                    <span className="ml-auto text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">Live</span>
+                  </div>
+                  <div className="flex items-center gap-4 text-xs text-gray-500">
+                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> 60 min</span>
+                    <span className="flex items-center gap-1"><Star className="w-3 h-3 text-yellow-400 fill-yellow-400" /> 4.9</span>
+                    <span className="flex items-center gap-1"><Users className="w-3 h-3" /> 1,200+ students</span>
+                  </div>
+                </div>
+
+                {/* Progress Card */}
+                <div className="bg-white rounded-xl shadow-md p-5 mb-4">
+                  <p className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wide">Your Progress</p>
+                  <div className="space-y-2">
+                    {[
+                      { label: 'Mathematics', pct: 78 },
+                      { label: 'Web Development', pct: 55 },
+                      { label: 'Data Science', pct: 40 },
+                    ].map(item => (
+                      <div key={item.label}>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-gray-600">{item.label}</span>
+                          <span className="text-primary-600 font-medium">{item.pct}%</span>
+                        </div>
+                        <div className="h-1.5 bg-gray-100 rounded-full">
+                          <div className="h-1.5 bg-primary-500 rounded-full" style={{ width: `${item.pct}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Achievement Badge */}
+                <div className="bg-white rounded-xl shadow-md p-4 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
+                    <Award className="w-5 h-5 text-yellow-500" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-gray-900">Top Achiever</p>
+                    <p className="text-xs text-gray-500">Completed 10 sessions</p>
+                  </div>
+                  <CheckCircle className="w-5 h-5 text-green-500" />
+                </div>
+
+                {/* Floating stat */}
+                <div className="absolute -top-4 -right-4 bg-secondary-500 text-white rounded-xl px-4 py-2 shadow-lg text-sm font-semibold">
+                  AI-Powered Learning
+                </div>
               </div>
             </motion.div>
           </div>
