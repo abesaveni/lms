@@ -5,15 +5,15 @@ import { motion } from 'framer-motion'
 import {
   Video, Globe, ArrowRight, Play,
   GraduationCap, Lightbulb, BookOpen, Star, Clock,
-  CheckCircle, Sparkles, Zap, Brain, TrendingUp, Shield, MessageSquare
+  CheckCircle, Sparkles, Zap, Brain, TrendingUp, Shield, MessageSquare, ChevronDown
 } from 'lucide-react'
-import { Accordion } from '../components/ui/Accordion'
 import { getPlatformStats } from '../services/tutorsApi'
 
 const Landing = () => {
   const navigate = useNavigate()
   const [studentCount, setStudentCount] = useState<number | null>(null)
   const [tutorCount, setTutorCount] = useState<number | null>(null)
+  const [faqOpen, setFaqOpen] = useState<number | null>(null)
 
   useEffect(() => {
     getPlatformStats()
@@ -314,7 +314,25 @@ const Landing = () => {
             </h2>
             <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>Everything you need to know before getting started.</p>
           </motion.div>
-          <Accordion items={faqs} />
+          <div className="space-y-2">
+            {faqs.map((faq, i) => (
+              <div key={i} className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)' }}>
+                <button
+                  onClick={() => setFaqOpen(faqOpen === i ? null : i)}
+                  className="w-full px-5 py-4 flex items-center justify-between text-left transition-colors"
+                  style={{ background: faqOpen === i ? 'rgba(124,58,237,0.1)' : 'transparent' }}
+                >
+                  <span className="text-sm font-semibold text-white">{faq.title}</span>
+                  <ChevronDown className="w-4 h-4 flex-shrink-0 ml-3 transition-transform" style={{ color: '#a78bfa', transform: faqOpen === i ? 'rotate(180deg)' : 'rotate(0deg)' }} />
+                </button>
+                {faqOpen === i && (
+                  <div className="px-5 pb-4 text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.6)' }}>
+                    {faq.content}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
