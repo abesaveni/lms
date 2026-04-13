@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json.schemastore.org/sarif-1.0.0",
+  "version": "1.0.0",
+  "runs": [
+    {
+      "tool": {
+        "name": "Microsoft (R) Visual C# Compiler",
+        "version": "5.0.0.0",
+        "fileVersion": "5.0.0-2.25612.105 (44525024)",
+        "semanticVersion": "5.0.0",
+        "language": "en-US"
+      },
+      "results": [
+        {
+          "ruleId": "CS1022",
+          "level": "error",
+          "message": "Type or namespace definition, or end-of-file expected",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///C:/Users/ELITEBOOK/Downloads/LMS-UPDATED-for-testing-main/LMS-UPDATED-for-testing-main/LMS-Backend/src/LiveExpert.API/Controllers/AdditionalControllers.cs",
+                "region": {
+                  "startLine": 298,
+                  "startColumn": 1,
+                  "endLine": 298,
+                  "endColumn": 2
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "rules": {
+        "CS1022": {
+          "id": "CS1022",
+          "defaultLevel": "error",
+          "helpUri": "https://msdn.microsoft.com/query/roslyn.query?appId=roslyn&k=k(CS1022)",
+          "properties": {
+            "category": "Compiler",
+            "isEnabledByDefault": true,
+            "tags": [
+              "Compiler",
+              "Telemetry",
+              "NotConfigurable"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

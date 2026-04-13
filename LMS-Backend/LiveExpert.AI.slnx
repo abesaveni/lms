@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/LiveExpert.API/LiveExpert.API.csproj" />
+    <Project Path="src/LiveExpert.Application/LiveExpert.Application.csproj" />
+    <Project Path="src/LiveExpert.Domain/LiveExpert.Domain.csproj" />
+    <Project Path="src/LiveExpert.Infrastructure/LiveExpert.Infrastructure.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,38 @@
+name: Deploy to Hetzner
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: ${{ secrets.HETZNER_USER }}
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/liveexpert
+
+            echo "── Pulling latest code ──────────────────────────────"
+            git pull origin main
+
+            echo "── Rebuilding and restarting containers ─────────────"
+            docker compose pull --ignore-pull-failures || true
+            docker compose build --no-cache
+            docker compose up -d --remove-orphans
+
+            echo "── Cleaning unused Docker images ────────────────────"
+            docker image prune -f
+
+            echo "── Deployment complete ───────────────────────────────"
+            docker compose ps

@@ -1,0 +1,6 @@
+@LiveExpert.API_HostAddress = http://localhost:5128
+
+GET {{LiveExpert.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

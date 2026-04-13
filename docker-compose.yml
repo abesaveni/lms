@@ -1,0 +1,82 @@
+version: "3.9"
+
+services:
+  # ── .NET Backend API ─────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./LMS-Backend
+      dockerfile: Dockerfile
+    container_name: liveexpert-backend
+    restart: unless-stopped
+    env_file:
+      - ./LMS-Backend/.env
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+    volumes:
+      - backend-data:/app/data      # SQLite database persistence
+      - backend-logs:/app/logs
+    expose:
+      - "8080"
+    networks:
+      - liveexpert-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ── React Frontend ────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./LMS-Frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=https://${DOMAIN}/api
+    container_name: liveexpert-frontend
+    restart: unless-stopped
+    expose:
+      - "80"
+    depends_on:
+      - backend
+    networks:
+      - liveexpert-net
+
+  # ── Nginx Reverse Proxy ───────────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: liveexpert-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - certbot-www:/var/www/certbot:ro
+      - certbot-conf:/etc/letsencrypt:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - liveexpert-net
+
+  # ── Certbot (SSL) ─────────────────────────────────────────────────────────────
+  certbot:
+    image: certbot/certbot:latest
+    container_name: liveexpert-certbot
+    volumes:
+      - certbot-www:/var/www/certbot
+      - certbot-conf:/etc/letsencrypt
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done'"
+
+volumes:
+  backend-data:
+  backend-logs:
+  certbot-www:
+  certbot-conf:
+
+networks:
+  liveexpert-net:
+    driver: bridge
