@@ -21,7 +21,7 @@ services:
     networks:
       - liveexpert-net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD-SHELL", "echo > /dev/tcp/localhost/8080 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
