@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { getCurrentUser } from '../utils/auth'
 import { motion } from 'framer-motion'
 import {
-  Video, Award, Globe, Users, ArrowRight, Play,
+  Video, Globe, ArrowRight, Play,
   GraduationCap, Lightbulb, BookOpen, Star, Clock,
   CheckCircle, Sparkles, Zap, Brain, TrendingUp, Shield, MessageSquare
 } from 'lucide-react'
