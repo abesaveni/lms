@@ -9,7 +9,6 @@ import { Badge } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import { useNavigate } from 'react-router-dom'
 import { getAdminDashboard, AdminDashboardDto } from '../../services/adminApi'
-import { AIChatAssistant } from '../../components/ai'
 
 const AdminDashboard = () => {
   const navigate = useNavigate()
@@ -243,7 +242,6 @@ const AdminDashboard = () => {
           </AnimatedCard>
         </div>
 
-        <AIChatAssistant userRole="admin" />
       </div>
     </div>
   )

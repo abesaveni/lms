@@ -9,7 +9,6 @@ import Button from '../../components/ui/Button'
 import { Avatar } from '../../components/ui/Avatar'
 import { isAdmin, getCurrentUser } from '../../utils/auth'
 import CalendarBlockingScreen from '../../components/calendar/CalendarBlockingScreen'
-import { AIChatAssistant } from '../../components/ai'
 
 import { getTutorProfile, TutorProfileDto, getEarningsOverview } from '../../services/tutorApi'
 import { getTutorSessions, SessionDto } from '../../services/sessionsApi'
@@ -389,7 +388,6 @@ const TutorDashboard = () => {
           </AnimatedCardContent>
         </AnimatedCard>
 
-        <AIChatAssistant userRole="tutor" />
       </div>
     </div>
   )

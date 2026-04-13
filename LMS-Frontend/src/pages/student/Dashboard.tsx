@@ -13,9 +13,6 @@ import { isAdmin } from '../../utils/auth'
 import { getCurrentUser } from '../../utils/auth'
 import { getBonusPointsSummary, BonusPointsSummary } from '../../services/bonusPointsApi'
 import { getStudentDashboard, getStudentStats, StudentDashboardDto, StudentStatsDto } from '../../services/studentApi'
-import {
-  AIChatAssistant
-} from '../../components/ai'
 
 const StudentDashboard = () => {
   const navigate = useNavigate()
@@ -337,7 +334,6 @@ const StudentDashboard = () => {
           </AnimatedCardContent>
         </AnimatedCard>
 
-        <AIChatAssistant userRole="student" />
       </div>
     </div>
   )
