@@ -7,9 +7,9 @@ RUN npm ci --frozen-lockfile
 
 COPY . .
 
-# VITE_API_URL is injected at build time via --build-arg
-ARG VITE_API_URL=https://api.liveexpert.ai
-ENV VITE_API_URL=$VITE_API_URL
+# VITE_API_BASE_URL is injected at build time via --build-arg
+ARG VITE_API_BASE_URL=https://liveexpert.ai/api
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
 RUN npm run build
 
