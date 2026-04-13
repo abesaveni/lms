@@ -435,7 +435,7 @@ const TutorOnboarding = () => {
                     className="hidden"
                   />
                   <User className="w-10 h-10 mx-auto mb-3 text-gray-400" />
-                  <Button variant="outline" as="span">
+                  <Button variant="outline" type="button">
                     <Upload className="mr-2 w-4 h-4" />
                     Upload ID Document
                   </Button>
