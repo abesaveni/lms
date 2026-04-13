@@ -33,7 +33,7 @@ services:
       context: ./LMS-Frontend
       dockerfile: Dockerfile
       args:
-        - VITE_API_BASE_URL=https://${DOMAIN}/api
+        - VITE_API_BASE_URL=https://liveexpert.ai/api
     container_name: liveexpert-frontend
     restart: unless-stopped
     expose:
