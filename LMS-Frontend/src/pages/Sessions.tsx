@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, SlidersHorizontal, Calendar, Users, Clock, Loader2 } from 'lucide-react'
+import { Search, Calendar, Users, Clock, Loader2, SlidersHorizontal } from 'lucide-react'
 import Button from '../components/ui/Button'
-import Input from '../components/ui/Input'
 import { Card } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { Avatar } from '../components/ui/Avatar'
@@ -12,29 +11,18 @@ import { getCurrentUser } from '../utils/auth'
 const Sessions = () => {
   const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState('')
-  const [showFilters, setShowFilters] = useState(false)
   const [sessions, setSessions] = useState<SessionDto[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [filters, setFilters] = useState({
-    sessionType: '',
-    subject: '',
-  })
+  const [filters, setFilters] = useState({ sessionType: '', subject: '' })
   const [sortBy, setSortBy] = useState('date')
+  const [showMobileFilters, setShowMobileFilters] = useState(false)
   const user = getCurrentUser()
   const isAuthenticated = !!user
 
-  // Load sessions on mount and when filters change
+  useEffect(() => { loadSessions() }, [searchQuery, filters, sortBy])
   useEffect(() => {
-    loadSessions()
-  }, [searchQuery, filters, sortBy])
-
-  // Real-time updates: Poll every 30 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      loadSessions()
-    }, 30000) // Refresh every 30 seconds
-
+    const interval = setInterval(loadSessions, 30000)
     return () => clearInterval(interval)
   }, [searchQuery, filters, sortBy])
 
@@ -42,62 +30,23 @@ const Sessions = () => {
     setIsLoading(true)
     setError(null)
     try {
-      const params: any = {
-        page: 1,
-        pageSize: 50,
-        upcoming: true, // Only get upcoming sessions
-      }
-
-      if (filters.subject) {
-        params.subject = filters.subject
-      }
-
-      const response = await getSessions(params)
-      let sessionsList = response.items || []
-
-      // Filter by session type (1-on-1 vs Group)
-      if (filters.sessionType) {
-        if (filters.sessionType === '1-on-1') {
-          sessionsList = sessionsList.filter(s => s.maxStudents === 1)
-        } else if (filters.sessionType === 'Group') {
-          sessionsList = sessionsList.filter(s => s.maxStudents > 1)
-        }
-      }
-
-      // Filter by search query
+      const response = await getSessions({ page: 1, pageSize: 50, upcoming: true, subject: filters.subject || undefined })
+      let list = response.items || []
+      if (filters.sessionType === '1-on-1') list = list.filter(s => s.maxStudents === 1)
+      else if (filters.sessionType === 'Group') list = list.filter(s => s.maxStudents > 1)
       if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase()
-        sessionsList = sessionsList.filter(s =>
-          (s.subject || s.subjectName || '')?.toLowerCase().includes(query) ||
-          (s.title || '')?.toLowerCase().includes(query) ||
-          s.tutorName?.toLowerCase().includes(query) ||
-          (s.description || '')?.toLowerCase().includes(query)
+        const q = searchQuery.toLowerCase()
+        list = list.filter(s =>
+          (s.subject || s.subjectName || '').toLowerCase().includes(q) ||
+          (s.title || '').toLowerCase().includes(q) ||
+          s.tutorName?.toLowerCase().includes(q) ||
+          (s.description || '').toLowerCase().includes(q)
         )
       }
-
-      // Sort sessions
-      if (sortBy === 'date') {
-        sessionsList.sort((a, b) => {
-          const aTime = (a as any).startTime || a.scheduledAt || ''
-          const bTime = (b as any).startTime || b.scheduledAt || ''
-          return new Date(aTime).getTime() - new Date(bTime).getTime()
-        })
-      } else if (sortBy === 'price-low') {
-        sessionsList.sort((a, b) => (a.basePrice || 0) - (b.basePrice || 0))
-      } else if (sortBy === 'availability') {
-        // Sort by available spots (more spots first)
-        sessionsList.sort((a, b) => {
-          const aEnrolled = (a as any).enrolledStudents || a.currentStudents || 0
-          const bEnrolled = (b as any).enrolledStudents || b.currentStudents || 0
-          const aSpots = (a.maxStudents || 0) - aEnrolled
-          const bSpots = (b.maxStudents || 0) - bEnrolled
-          return bSpots - aSpots
-        })
-      }
-
-      setSessions(sessionsList)
+      if (sortBy === 'date') list.sort((a, b) => new Date((a as any).startTime || a.scheduledAt || '').getTime() - new Date((b as any).startTime || b.scheduledAt || '').getTime())
+      else if (sortBy === 'price-low') list.sort((a, b) => (a.basePrice || 0) - (b.basePrice || 0))
+      setSessions(list)
     } catch (err: any) {
-      console.error('Failed to load sessions:', err)
       setError(err.message || 'Failed to load sessions')
       setSessions([])
     } finally {
@@ -106,290 +55,199 @@ const Sessions = () => {
   }
 
   const handleBookSession = (sessionId: string) => {
-    if (!isAuthenticated) {
-      if (confirm('Please login to book sessions. Would you like to login now?')) {
-        navigate('/login')
-      }
-      return
-    }
+    if (!isAuthenticated) { if (confirm('Please login to book sessions. Login now?')) navigate('/login'); return }
     navigate(`/sessions/${sessionId}/book`)
   }
 
-  const handleApplyFilters = () => {
-    loadSessions()
-  }
+  const formatDate = (d?: string) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'
+  const formatTime = (d?: string) => d ? new Date(d).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : 'N/A'
+  const getSessionType = (max: number) => max === 1 ? '1-on-1' : 'Group'
 
-  const handleClearFilters = () => {
-    setFilters({
-      sessionType: '',
-      subject: '',
-    })
-    setSearchQuery('')
-  }
-
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return 'N/A'
-    const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  }
-
-  const formatTime = (dateString?: string) => {
-    if (!dateString) return 'N/A'
-    const date = new Date(dateString)
-    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-  }
-
-  const getSessionType = (maxStudents: number) => {
-    return maxStudents === 1 ? '1-on-1' : 'Group'
-  }
+  const FilterPanel = () => (
+    <div className="space-y-5">
+      <div>
+        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Session Type</label>
+        <select
+          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-300"
+          value={filters.sessionType}
+          onChange={(e) => setFilters({ ...filters, sessionType: e.target.value })}
+        >
+          <option value="">All Types</option>
+          <option value="1-on-1">1-on-1</option>
+          <option value="Group">Group</option>
+        </select>
+      </div>
+      <div>
+        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Subject</label>
+        <select
+          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-300"
+          value={filters.subject}
+          onChange={(e) => setFilters({ ...filters, subject: e.target.value })}
+        >
+          <option value="">All Subjects</option>
+          <option value="Web Development">Web Development</option>
+          <option value="Data Science">Data Science</option>
+          <option value="Design">Design</option>
+          <option value="Mathematics">Mathematics</option>
+          <option value="Python Programming">Python Programming</option>
+        </select>
+      </div>
+      <button
+        onClick={() => setFilters({ sessionType: '', subject: '' })}
+        className="w-full text-xs text-gray-400 hover:text-gray-600 transition-colors py-1"
+      >
+        Clear filters
+      </button>
+    </div>
+  )
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Browse Sessions</h1>
-        <p className="text-gray-600">Find group and private sessions created by tutors</p>
-        {!isAuthenticated && (
-          <div className="mt-4 p-4 bg-primary-50 border border-primary-200 rounded-lg">
-            <p className="text-sm text-primary-800">
-              <strong>Note:</strong> You can browse sessions without logging in. To book sessions, please{' '}
-              <button
-                onClick={() => navigate('/login')}
-                className="underline font-semibold hover:text-primary-900"
-              >
-                login
-              </button>
-              {' '}or{' '}
-              <button
-                onClick={() => navigate('/register')}
-                className="underline font-semibold hover:text-primary-900"
-              >
-                register
-              </button>
-              .
-            </p>
-          </div>
-        )}
-      </div>
+    <div className="bg-gray-50 min-h-screen">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
-      {/* Search and Filters */}
-      <div className="mb-8">
-        <div className="flex flex-col md:flex-row gap-4 mb-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <Input
-              placeholder="Search sessions by title, tutor, or subject..."
+        {/* Page Header */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Browse Sessions</h1>
+          <p className="text-sm text-gray-500 mt-1">Find group and private sessions created by tutors</p>
+        </div>
+
+        {/* Search bar + sort row */}
+        <div className="flex flex-col sm:flex-row gap-3 mb-6">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search by title, tutor, or subject..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-300"
             />
           </div>
-          <Button
-            variant="outline"
-            onClick={() => setShowFilters(!showFilters)}
-            className="md:hidden"
-          >
-            <SlidersHorizontal className="w-5 h-5 mr-2" />
-            Filters
-          </Button>
-        </div>
-
-        {/* Filter Sidebar */}
-        {showFilters && (
-          <Card className="mb-4 md:mb-0 md:absolute md:left-4 md:w-64">
-            <div className="p-4">
-              <h3 className="font-semibold mb-4">Filters</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Session Type
-                  </label>
-                  <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                    value={filters.sessionType}
-                    onChange={(e) => setFilters({ ...filters, sessionType: e.target.value })}
-                  >
-                    <option value="">All Types</option>
-                    <option value="1-on-1">1-on-1</option>
-                    <option value="Group">Group</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Subject
-                  </label>
-                  <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                    value={filters.subject}
-                    onChange={(e) => setFilters({ ...filters, subject: e.target.value })}
-                  >
-                    <option value="">All Subjects</option>
-                    <option value="Web Development">Web Development</option>
-                    <option value="Data Science">Data Science</option>
-                    <option value="Design">Design</option>
-                  </select>
-                </div>
-                <Button fullWidth onClick={handleApplyFilters}>Apply Filters</Button>
-                <Button variant="ghost" fullWidth onClick={handleClearFilters}>
-                  Clear
-                </Button>
-              </div>
-            </div>
-          </Card>
-        )}
-
-        {/* Desktop Filter Sidebar */}
-        <div className="hidden md:block md:relative">
-          <div className="md:absolute md:left-0 md:top-0 md:w-64">
-            <Card>
-              <div className="p-4">
-                <h3 className="font-semibold mb-4">Filters</h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Session Type
-                    </label>
-                    <select
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                      value={filters.sessionType}
-                      onChange={(e) => setFilters({ ...filters, sessionType: e.target.value })}
-                    >
-                      <option value="">All Types</option>
-                      <option value="1-on-1">1-on-1</option>
-                      <option value="Group">Group</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Subject
-                    </label>
-                    <select
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                      value={filters.subject}
-                      onChange={(e) => setFilters({ ...filters, subject: e.target.value })}
-                    >
-                      <option value="">All Subjects</option>
-                      <option value="Web Development">Web Development</option>
-                      <option value="Data Science">Data Science</option>
-                      <option value="Design">Design</option>
-                    </select>
-                  </div>
-                  <Button fullWidth onClick={handleApplyFilters}>Apply Filters</Button>
-                  <Button variant="ghost" fullWidth onClick={handleClearFilters}>
-                    Clear
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          </div>
-        </div>
-      </div>
-
-      {/* Sessions Grid */}
-      <div className="md:ml-72">
-        <div className="flex items-center justify-between mb-6">
-          <p className="text-gray-600">
-            {isLoading ? (
-              'Loading sessions...'
-            ) : error ? (
-              <span className="text-red-600">{error}</span>
-            ) : (
-              <>
-                Found <span className="font-semibold">{sessions.length}</span> sessions
-              </>
-            )}
-          </p>
           <select
-            className="px-3 py-2 border border-gray-300 rounded-lg"
+            className="px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-300"
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
           >
-            <option value="date">Sort by: Date</option>
-            <option value="price-low">Sort by: Price (Low to High)</option>
-            <option value="availability">Sort by: Availability</option>
+            <option value="date">Sort: Date</option>
+            <option value="price-low">Sort: Price (Low–High)</option>
+            <option value="availability">Sort: Availability</option>
           </select>
+          <button
+            className="sm:hidden flex items-center gap-2 px-4 py-2.5 text-sm font-medium border border-gray-200 rounded-lg bg-white"
+            onClick={() => setShowMobileFilters(!showMobileFilters)}
+          >
+            <SlidersHorizontal className="w-4 h-4" /> Filters
+          </button>
         </div>
 
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
-          </div>
-        ) : error ? (
-          <div className="text-center py-12">
-            <p className="text-red-600 mb-4">{error}</p>
-            <Button onClick={loadSessions}>Try Again</Button>
-          </div>
-        ) : sessions.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-600">No sessions found. Try adjusting your filters.</p>
-          </div>
-        ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {sessions.map((session) => {
-              const sessionType = getSessionType(session.maxStudents)
-              const enrolledStudents = (session as any).enrolledStudents || session.currentStudents || 0
-              const availableSpots = session.maxStudents - enrolledStudents
-              const price = session.basePrice || 0
-              const pricingLabel = session.pricingType === 'Hourly' ? '/hr' : ''
-              const subject = session.subject || session.subjectName || 'General'
-              const title = session.title || subject
-              const timeString = (session as any).startTime || session.scheduledAt || ''
-
-              return (
-                <Card key={session.id} hover>
-                  <div className="p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <Avatar name={session.tutorName} size="md" />
-                        <div>
-                          <h3 className="font-semibold text-gray-900">{session.tutorName}</h3>
-                          <p className="text-sm text-gray-600">{subject}</p>
-                        </div>
-                      </div>
-                      <Badge variant={sessionType === '1-on-1' ? 'info' : 'success'}>
-                        {sessionType}
-                      </Badge>
-                    </div>
-                    <h4 className="text-lg font-semibold text-gray-900 mb-3">{title}</h4>
-                    {session.description && (
-                      <p className="text-sm text-gray-600 mb-3 line-clamp-2">{session.description}</p>
-                    )}
-                    <div className="space-y-2 mb-4">
-                      {timeString && (
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <Calendar className="w-4 h-4" />
-                          <span>{formatDate(timeString)} at {formatTime(timeString)}</span>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Clock className="w-4 h-4" />
-                        <span>Duration: {session.duration} min</span>
-                      </div>
-                      {sessionType === 'Group' && (
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <Users className="w-4 h-4" />
-                          <span>{enrolledStudents}/{session.maxStudents} students enrolled</span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                      <div>
-                        <span className="text-2xl font-bold text-gray-900">₹{price}{pricingLabel}</span>
-                      </div>
-                      <Button
-                        size="sm"
-                        onClick={() => handleBookSession(session.id)}
-                        disabled={sessionType === 'Group' && availableSpots === 0}
-                      >
-                        {sessionType === 'Group' && availableSpots === 0 ? 'Full' : 'Book Now'}
-                      </Button>
-                    </div>
-                  </div>
-                </Card>
-              )
-            })}
+        {/* Mobile filters */}
+        {showMobileFilters && (
+          <div className="sm:hidden bg-white rounded-lg border border-gray-200 p-4 mb-4">
+            <FilterPanel />
           </div>
         )}
+
+        {/* Main layout: sidebar + grid */}
+        <div className="flex gap-6">
+
+          {/* Sidebar — desktop only */}
+          <aside className="hidden sm:block w-56 flex-shrink-0">
+            <div className="bg-white rounded-xl border border-gray-200 p-5 sticky top-24">
+              <h3 className="text-sm font-semibold text-gray-800 mb-4">Filters</h3>
+              <FilterPanel />
+            </div>
+          </aside>
+
+          {/* Content */}
+          <div className="flex-1 min-w-0">
+            {/* Result count */}
+            <p className="text-sm text-gray-500 mb-4">
+              {isLoading ? 'Loading...' : error ? <span className="text-red-500">{error}</span> : <><span className="font-semibold text-gray-800">{sessions.length}</span> sessions found</>}
+            </p>
+
+            {isLoading ? (
+              <div className="flex items-center justify-center py-20">
+                <Loader2 className="w-7 h-7 animate-spin text-primary-500" />
+              </div>
+            ) : error ? (
+              <div className="text-center py-16">
+                <p className="text-red-500 text-sm mb-3">{error}</p>
+                <Button size="sm" onClick={loadSessions}>Retry</Button>
+              </div>
+            ) : sessions.length === 0 ? (
+              <div className="text-center py-20 bg-white rounded-xl border border-dashed border-gray-200">
+                <Search className="w-8 h-8 text-gray-300 mx-auto mb-3" />
+                <p className="text-sm font-medium text-gray-700">No sessions found</p>
+                <p className="text-xs text-gray-400 mt-1">Try adjusting your filters or search query</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {sessions.map((session) => {
+                  const type = getSessionType(session.maxStudents)
+                  const enrolled = (session as any).enrolledStudents || session.currentStudents || 0
+                  const spots = session.maxStudents - enrolled
+                  const price = session.basePrice || 0
+                  const subject = session.subject || session.subjectName || 'General'
+                  const title = session.title || subject
+                  const timeStr = (session as any).startTime || session.scheduledAt || ''
+
+                  return (
+                    <Card key={session.id} hover>
+                      <div className="p-5">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2.5">
+                            <Avatar name={session.tutorName} size="sm" />
+                            <div>
+                              <p className="text-sm font-semibold text-gray-900 leading-tight">{session.tutorName}</p>
+                              <p className="text-xs text-gray-500">{subject}</p>
+                            </div>
+                          </div>
+                          <Badge variant={type === '1-on-1' ? 'info' : 'success'} className="text-xs">{type}</Badge>
+                        </div>
+
+                        <h4 className="text-sm font-semibold text-gray-900 mb-3 line-clamp-1">{title}</h4>
+
+                        {session.description && (
+                          <p className="text-xs text-gray-500 mb-3 line-clamp-2">{session.description}</p>
+                        )}
+
+                        <div className="space-y-1.5 mb-4">
+                          {timeStr && (
+                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                              <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
+                              <span>{formatDate(timeStr)} at {formatTime(timeStr)}</span>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                            <Clock className="w-3.5 h-3.5 flex-shrink-0" />
+                            <span>{session.duration} min</span>
+                          </div>
+                          {type === 'Group' && (
+                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                              <Users className="w-3.5 h-3.5 flex-shrink-0" />
+                              <span>{enrolled}/{session.maxStudents} enrolled</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                          <span className="text-base font-bold text-gray-900">${price}{session.pricingType === 'Hourly' ? '/hr' : ''}</span>
+                          <Button
+                            size="sm"
+                            onClick={() => handleBookSession(session.id)}
+                            disabled={type === 'Group' && spots === 0}
+                          >
+                            {type === 'Group' && spots === 0 ? 'Full' : 'Book Now'}
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )

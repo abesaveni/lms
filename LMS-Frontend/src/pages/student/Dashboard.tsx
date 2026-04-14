@@ -75,9 +75,8 @@ const StudentDashboard = () => {
     }
   }, [])
 
-  // MANDATORY: Block access if calendar not connected (skip for admins)
-  if (!isAdmin() && isCalendarConnected === false) {
-    return <CalendarBlockingScreen userRole="student" />
+  // Calendar connection is optional — show as a banner, not a blocker
+  const showCalendarBanner = !isAdmin() && isCalendarConnected === false
   }
 
   // Upcoming sessions are now loaded from the API
@@ -85,27 +84,40 @@ const StudentDashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Calendar connection banner */}
+        {showCalendarBanner && (
+          <div className="mb-6 flex items-center justify-between gap-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+            <div className="flex items-center gap-3">
+              <Calendar className="w-5 h-5 text-amber-600 flex-shrink-0" />
+              <p className="text-sm text-amber-800">Connect your Google Calendar to sync sessions and get reminders.</p>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                onClick={() => navigate('/calendar/connect')}
+                className="text-xs font-semibold text-amber-700 hover:text-amber-900 underline"
+              >
+                Connect
+              </button>
+              <button
+                onClick={() => setIsCalendarConnected(true)}
+                className="text-xs text-amber-500 hover:text-amber-700"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Welcome Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
+          className="mb-6"
         >
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <h1 className="text-4xl font-bold text-gray-900 mb-2 flex items-center gap-3">
-                Welcome back, {userName}!
-                <motion.span
-                  animate={{ rotate: [0, 14, -8, 10, 0] }}
-                  transition={{ duration: 0.5 }}
-                  style={{ display: 'inline-block' }}
-                >
-                  👋
-                </motion.span>
-              </h1>
-              <p className="text-gray-600 text-lg">Here's what's happening with your learning journey</p>
-            </div>
-          </div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Welcome back, {userName}!
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">Here's what's happening with your learning journey</p>
         </motion.div>
 
         {/* Stats Cards */}
