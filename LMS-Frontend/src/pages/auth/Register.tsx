@@ -1121,6 +1121,16 @@ const Register = () => {
                       </div>
                     ) : (
                       <div className="space-y-4">
+                        {errors.verificationCode && (
+                          <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+                            {errors.verificationCode}
+                          </div>
+                        )}
+                        {errors.email && (
+                          <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+                            {errors.email}
+                          </div>
+                        )}
                         <Button type="submit" fullWidth isLoading={isSendingCode}>
                           {isSendingCode ? 'Sending...' : 'Send Verification Code'}
                           <Mail className="ml-2 w-5 h-5" />
