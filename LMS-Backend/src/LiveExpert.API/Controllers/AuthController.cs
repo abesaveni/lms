@@ -1,7 +1,6 @@
 using LiveExpert.Application.Common;
 using LiveExpert.Application.Features.Auth.Commands;
 using MediatR;
-using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LiveExpert.API.Controllers;
@@ -11,7 +10,6 @@ namespace LiveExpert.API.Controllers;
 /// </summary>
 [Route("api/auth")]
 [ApiController]
-[EnableCors("AllowAllDev")] // Explicitly enable CORS for this controller
 public class AuthController : ControllerBase
 {
     private readonly IMediator _mediator;
