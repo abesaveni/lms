@@ -126,7 +126,7 @@ const Register = () => {
           }, 1000)
         } catch (error: any) {
           setErrors({
-            email: error.message || 'Failed to send verification code.',
+            verificationCode: error.message || 'Failed to send verification code. Please try again.',
           })
         } finally {
           setIsSendingCode(false)
@@ -1079,9 +1079,10 @@ const Register = () => {
                     {codeSent ? (
                       <div className="space-y-4">
                         {devOtp && (
-                          <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
-                            <span className="font-medium">Dev mode — email not configured.</span><br />
-                            Your OTP is: <span className="font-mono font-bold text-lg tracking-widest">{devOtp}</span>
+                          <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-4 text-center">
+                            <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-1">⚠️ Email not working — use this OTP</p>
+                            <p className="font-mono font-bold text-3xl tracking-[0.4em] text-amber-900 select-all">{devOtp}</p>
+                            <p className="text-xs text-amber-600 mt-1">Tap the code to select, then paste it below</p>
                           </div>
                         )}
                         <div>
