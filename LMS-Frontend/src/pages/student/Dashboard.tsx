@@ -77,7 +77,6 @@ const StudentDashboard = () => {
 
   // Calendar connection is optional — show as a banner, not a blocker
   const showCalendarBanner = !isAdmin() && isCalendarConnected === false
-  }
 
   // Upcoming sessions are now loaded from the API
 
