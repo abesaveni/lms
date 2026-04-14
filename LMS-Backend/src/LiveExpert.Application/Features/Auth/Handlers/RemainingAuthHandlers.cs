@@ -209,7 +209,7 @@ public class ForgotPasswordCommandHandler : IRequestHandler<ForgotPasswordComman
         await _userRepository.UpdateAsync(user, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        var resetLink = $"http://localhost:5173/reset-password?token={resetToken}&userId={user.Id}";
+        var resetLink = $"https://liveexpert.ai/reset-password?token={resetToken}&userId={user.Id}";
 
         // Send password reset email
         await _notificationService.SendForgotPasswordEmailAsync(user, resetLink, 60, cancellationToken);

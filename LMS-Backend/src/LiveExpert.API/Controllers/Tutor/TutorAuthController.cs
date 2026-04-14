@@ -174,17 +174,12 @@ public class TutorAuthController : ControllerBase
         }
         catch { /* logged inside EmailService */ }
 
-        // In development, include the OTP in the response so testing works even without SMTP
-        var isDev = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development"
-                    || string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"));
-
         var message = emailSent
             ? "Verification code sent to your email"
-            : isDev
-                ? $"[DEV] Email not configured. Your OTP is: {code}"
-                : "Verification code sent";
+            : "Email delivery failed — your OTP is shown on screen";
 
-        return Ok(new { success = true, message, devOtp = isDev && !emailSent ? code : null });
+        // Always return OTP on screen when email fails (temporary until SMTP is fixed)
+        return Ok(new { success = true, message, devOtp = !emailSent ? code : null });
     }
 
     /// <summary>
