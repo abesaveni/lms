@@ -4,6 +4,7 @@ using LiveExpert.Application.Interfaces;
 using LiveExpert.Domain.Entities;
 using LiveExpert.Domain.Enums;
 using MediatR;
+using Microsoft.Extensions.Configuration;
 
 namespace LiveExpert.Application.Features.Auth.Handlers;
 
@@ -21,6 +22,7 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, Result<Re
     private readonly ISystemSettingsService _settingsService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICacheService _cacheService;
+    private readonly IConfiguration _configuration;
 
     public RegisterCommandHandler(
         IRepository<User> userRepository,
@@ -33,7 +35,8 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, Result<Re
         INotificationService notificationService,
         ISystemSettingsService settingsService,
         IUnitOfWork unitOfWork,
-        ICacheService cacheService)
+        ICacheService cacheService,
+        IConfiguration configuration)
     {
         _userRepository = userRepository;
         _tutorRepository = tutorRepository;
@@ -47,6 +50,44 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, Result<Re
         _settingsService = settingsService;
         _unitOfWork = unitOfWork;
         _cacheService = cacheService;
+        _configuration = configuration;
+    }
+
+    /// <summary>
+    /// Validates the stateless HMAC-signed signup verification token.
+    /// Token format: {base64(email)}:{expiry_unix}:{hmac_hex}
+    /// </summary>
+    private bool ValidateSignupToken(string? token, string email)
+    {
+        if (string.IsNullOrWhiteSpace(token)) return false;
+        try
+        {
+            var parts = token.Split(':');
+            if (parts.Length != 3) return false;
+            var emailB64 = parts[0];
+            if (!long.TryParse(parts[1], out var expiryUnix)) return false;
+            var signature = parts[2];
+
+            // Check expiry
+            if (DateTimeOffset.UtcNow.ToUnixTimeSeconds() > expiryUnix) return false;
+
+            // Check email matches
+            var tokenEmail = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(emailB64));
+            if (!string.Equals(tokenEmail, email.Trim().ToLowerInvariant(), StringComparison.OrdinalIgnoreCase)) return false;
+
+            // Verify HMAC signature
+            var jwtKey = Environment.GetEnvironmentVariable("JWT__KEY")
+                ?? _configuration["Jwt:Key"]
+                ?? "YourSuperSecretKeyThatIsAtLeast32CharactersLong!";
+            var payload = $"{emailB64}:{expiryUnix}";
+            using var hmac = new System.Security.Cryptography.HMACSHA256(System.Text.Encoding.UTF8.GetBytes(jwtKey));
+            var expectedSig = BitConverter.ToString(hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(payload))).Replace("-", "").ToLower();
+            return string.Equals(signature, expectedSig, StringComparison.Ordinal);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     public async Task<Result<RegisterResponse>> Handle(RegisterCommand request, CancellationToken cancellationToken)
@@ -67,18 +108,17 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, Result<Re
 
         try
         {
-            // Create user
-            var verificationKey = $"signup-email:{request.Email.Trim().ToLowerInvariant()}";
-            var verificationState = await _cacheService.GetAsync<SignupEmailVerificationState>(verificationKey);
-            if (verificationState == null ||
-                !verificationState.Verified ||
-                verificationState.VerificationToken != request.SignupVerificationToken ||
-                verificationState.ExpiresAt < DateTime.UtcNow)
+            // Validate signup verification token (stateless HMAC — survives server restarts)
+            if (!ValidateSignupToken(request.SignupVerificationToken, request.Email))
             {
                 return Result<RegisterResponse>.FailureResult(
                     "EMAIL_NOT_VERIFIED",
-                    "Please verify your email before completing signup.");
+                    "Email verification expired or invalid. Please go back and verify your email again.");
             }
+
+            // Clean up cache entry if it still exists
+            var verificationKey = $"signup-email:{request.Email.Trim().ToLowerInvariant()}";
+            await _cacheService.RemoveAsync(verificationKey);
 
             var user = new User
             {
@@ -152,8 +192,6 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, Result<Re
             }
 
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
-
-            await _cacheService.RemoveAsync(verificationKey);
 
             // Send welcome emails/WhatsApp — fire-and-forget, do not fail registration if email is unconfigured
             try

@@ -6,6 +6,7 @@ using LiveExpert.Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -22,17 +23,33 @@ public class TutorAuthController : ControllerBase
     private readonly IEmailService _emailService;
     private readonly ICacheService _cacheService;
     private readonly ILogger<TutorAuthController> _logger;
+    private readonly IConfiguration _configuration;
 
     public TutorAuthController(
         IMediator mediator,
         IEmailService emailService,
         ICacheService cacheService,
-        ILogger<TutorAuthController> logger)
+        ILogger<TutorAuthController> logger,
+        IConfiguration configuration)
     {
         _mediator = mediator;
         _emailService = emailService;
         _cacheService = cacheService;
         _logger = logger;
+        _configuration = configuration;
+    }
+
+    private string GenerateSignupVerificationToken(string email)
+    {
+        var jwtKey = Environment.GetEnvironmentVariable("JWT__KEY")
+            ?? _configuration["Jwt:Key"]
+            ?? "YourSuperSecretKeyThatIsAtLeast32CharactersLong!";
+        var expiryUnix = DateTimeOffset.UtcNow.AddMinutes(30).ToUnixTimeSeconds();
+        var emailB64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(email.Trim().ToLowerInvariant()));
+        var payload = $"{emailB64}:{expiryUnix}";
+        using var hmac = new System.Security.Cryptography.HMACSHA256(System.Text.Encoding.UTF8.GetBytes(jwtKey));
+        var signature = BitConverter.ToString(hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(payload))).Replace("-", "").ToLower();
+        return $"{payload}:{signature}";
     }
 
     /// <summary>
@@ -203,13 +220,14 @@ public class TutorAuthController : ControllerBase
         }
 
         entry.Verified = true;
-        entry.VerificationToken = Guid.NewGuid().ToString("N");
         entry.ExpiresAt = DateTime.UtcNow.AddMinutes(30);
         await _cacheService.SetAsync(cacheKey, entry, TimeSpan.FromMinutes(30));
 
+        var verificationToken = GenerateSignupVerificationToken(request.Email);
+
         return Ok(Result<SignupVerificationResponse>.SuccessResult(new SignupVerificationResponse
         {
-            VerificationToken = entry.VerificationToken
+            VerificationToken = verificationToken
         }));
     }
 
