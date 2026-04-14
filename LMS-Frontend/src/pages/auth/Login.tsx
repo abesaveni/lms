@@ -135,6 +135,7 @@ const Login = () => {
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               error={errors.email}
               placeholder="you@example.com"
+              autoComplete="off"
               required
             />
 
@@ -150,6 +151,7 @@ const Login = () => {
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   error={errors.password}
                   placeholder="Enter your password"
+                  autoComplete="new-password"
                   className="pr-10"
                   required
                 />
