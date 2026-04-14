@@ -108,7 +108,10 @@ builder.Services.AddCors(options =>
             origins.Add($"http://localhost:{port}");
 
         if (includeProduction)
+        {
             origins.Add("https://liveexpert.ai");
+            origins.Add("https://www.liveexpert.ai");
+        }
 
         p.WithOrigins(origins.ToArray())
          .AllowAnyMethod()
