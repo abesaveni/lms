@@ -5,11 +5,11 @@ import logoImage from '../../assets/logo.png'
 const Footer = () => {
   const companyLinks = [
     { label: 'Home', path: '/' },
-    { label: 'Instructor', path: '/student/find-tutors' },
-    { label: 'About Us', path: '/about' },
-    { label: 'Become Instructor', path: '/join-us' },
-    { label: 'Contact Us', path: '/contact' },
-    { label: 'Blog', path: '/blog' },
+    { label: 'Find Tutors', path: '/find-tutors' },
+    { label: 'About Us', path: '/about-us' },
+    { label: 'Become a Tutor', path: '/join-us?role=tutor' },
+    { label: 'Privacy Policy', path: '/privacy-policy' },
+    { label: 'Terms & Conditions', path: '/terms-and-conditions' },
   ]
 
   return (
@@ -63,8 +63,6 @@ const Footer = () => {
             <h3 className="text-white font-semibold mb-4">Contact Us</h3>
             <ul className="space-y-2 text-sm text-gray-400">
               <li>Email: support@liveexpert.ai</li>
-              <li>Phone: +1 (555) 123-4567</li>
-              <li>Address: 123 Main Street, City, Country</li>
             </ul>
           </div>
         </div>
@@ -73,14 +71,6 @@ const Footer = () => {
         <div className="border-t border-gray-800 pt-6">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-gray-400">
             <p>© 2026 LiveExpert.AI. All rights reserved.</p>
-            <div className="flex gap-6">
-              <Link to="/terms-and-conditions" className="hover:text-primary-400 transition-colors">
-                Terms and Conditions
-              </Link>
-              <Link to="/privacy-policy" className="hover:text-primary-400 transition-colors">
-                Privacy Policy
-              </Link>
-            </div>
           </div>
         </div>
       </div>
