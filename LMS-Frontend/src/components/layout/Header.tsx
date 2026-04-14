@@ -39,11 +39,11 @@ const Header = () => {
   }
 
   const navLinks = [
-    { label: 'Home', path: '/' },
-    { label: 'Find Tutors', path: '/find-tutors' },
-    { label: 'Sessions', path: '/sessions' },
-    { label: 'About Us', path: '/about-us' },
-  ]
+    { label: 'Home', path: '/', authRequired: false },
+    { label: 'Find Tutors', path: '/find-tutors', authRequired: true },
+    { label: 'Sessions', path: '/sessions', authRequired: true },
+    { label: 'About Us', path: '/about-us', authRequired: false },
+  ].filter(link => !link.authRequired || isAuthenticated)
 
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-200">
