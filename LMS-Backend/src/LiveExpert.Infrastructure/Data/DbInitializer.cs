@@ -195,9 +195,11 @@ public static class DbInitializer
                 if (!noShowProtectionExists) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE Sessions ADD COLUMN NoShowProtection INTEGER NOT NULL DEFAULT 0"; c2.ExecuteNonQuery(); }
                 if (!requiresSubscriptionExists) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE Sessions ADD COLUMN RequiresSubscription INTEGER NOT NULL DEFAULT 0"; c2.ExecuteNonQuery(); }
 
-                // ── HasBackgroundCheck + BackgroundCheckDate on TutorProfiles ──────────
+                // ── TutorProfiles: all new columns ───────────────────────────────────
                 checkCmd.CommandText = "PRAGMA table_info(TutorProfiles)";
-                bool hasBgCheck = false, bgCheckDate = false;
+                bool hasBgCheck = false, bgCheckDate = false, tpVerifReminder = false;
+                bool tpTeachingStyles = false, tpAgeGroups = false;
+                bool tpTrialAvailable = false, tpTrialDuration = false, tpTrialPrice = false;
                 using (var tpReader = checkCmd.ExecuteReader())
                 {
                     while (tpReader.Read())
@@ -205,10 +207,22 @@ public static class DbInitializer
                         var col = tpReader["name"].ToString();
                         if (col == "HasBackgroundCheck") hasBgCheck = true;
                         if (col == "BackgroundCheckDate") bgCheckDate = true;
+                        if (col == "VerificationReminderSent") tpVerifReminder = true;
+                        if (col == "TeachingStyles") tpTeachingStyles = true;
+                        if (col == "AgeGroups") tpAgeGroups = true;
+                        if (col == "TrialAvailable") tpTrialAvailable = true;
+                        if (col == "TrialDurationMinutes") tpTrialDuration = true;
+                        if (col == "TrialPrice") tpTrialPrice = true;
                     }
                 }
                 if (!hasBgCheck) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorProfiles ADD COLUMN HasBackgroundCheck INTEGER NOT NULL DEFAULT 0"; c2.ExecuteNonQuery(); }
                 if (!bgCheckDate) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorProfiles ADD COLUMN BackgroundCheckDate TEXT NULL"; c2.ExecuteNonQuery(); }
+                if (!tpVerifReminder) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorProfiles ADD COLUMN VerificationReminderSent INTEGER NOT NULL DEFAULT 0"; c2.ExecuteNonQuery(); }
+                if (!tpTeachingStyles) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorProfiles ADD COLUMN TeachingStyles TEXT NULL"; c2.ExecuteNonQuery(); }
+                if (!tpAgeGroups) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorProfiles ADD COLUMN AgeGroups TEXT NULL"; c2.ExecuteNonQuery(); }
+                if (!tpTrialAvailable) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorProfiles ADD COLUMN TrialAvailable INTEGER NOT NULL DEFAULT 0"; c2.ExecuteNonQuery(); }
+                if (!tpTrialDuration) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorProfiles ADD COLUMN TrialDurationMinutes INTEGER NOT NULL DEFAULT 30"; c2.ExecuteNonQuery(); }
+                if (!tpTrialPrice) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorProfiles ADD COLUMN TrialPrice TEXT NOT NULL DEFAULT '0'"; c2.ExecuteNonQuery(); }
 
                 // ── CouponDiscount on SessionBookings ─────────────────────────────────
                 checkCmd.CommandText = "PRAGMA table_info(SessionBookings)";
@@ -304,8 +318,9 @@ public static class DbInitializer
                 if (!rpIsTutor) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE ReferralPrograms ADD COLUMN IsTutorReferral INTEGER NOT NULL DEFAULT 0"; c2.ExecuteNonQuery(); }
 
                 // ── TutorProfiles: TutorReferralCode, AutoPayoutSchedule, AutoPayoutMinimumAmount ──
-                checkCmd.CommandText = "PRAGMA table_info(TutorProfiles)";
+                // (re-use the same tpReader pass — check vars set above)
                 bool tpTutorRefCode = false, tpAutoPayout = false, tpAutoPayoutMin = false;
+                checkCmd.CommandText = "PRAGMA table_info(TutorProfiles)";
                 using (var tpReader2 = checkCmd.ExecuteReader())
                 {
                     while (tpReader2.Read())

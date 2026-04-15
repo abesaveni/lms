@@ -4,7 +4,7 @@
 
 @layer base {
   html {
-    font-size: 14px;
+    font-size: 12px;
   }
   body {
     @apply bg-gray-50 text-gray-900 antialiased;
