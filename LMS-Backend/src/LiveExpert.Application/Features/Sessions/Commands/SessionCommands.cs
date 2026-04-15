@@ -56,6 +56,8 @@ public class BookSessionCommand : IRequest<Result<BookingDto>>
     public int? Hours { get; set; }
     /// <summary>When true, available bonus points are applied as a discount (1 point = ₹1).</summary>
     public bool UsePoints { get; set; } = false;
+    /// <summary>Optional coupon code to apply at booking time.</summary>
+    public string? CouponCode { get; set; }
     // Feature 1: Pre-session questionnaire
     public string? Goals { get; set; }
     public string? CurrentLevel { get; set; }
@@ -133,6 +135,7 @@ public class BookingDto
     public decimal BaseAmount { get; set; }
     public decimal PlatformFee { get; set; }
     public decimal PointsDiscount { get; set; }
+    public decimal CouponDiscount { get; set; }
     public decimal TotalAmount { get; set; }
     public string? RazorpayOrderId { get; set; }
     public string? RazorpayKey { get; set; }

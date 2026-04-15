@@ -61,6 +61,34 @@ public class CreateCouponCommandHandler : IRequestHandler<CreateCouponCommand, R
     };
 }
 
+// ── List All Coupons ─────────────────────────────────────────────────────────
+public class ListCouponsQueryHandler : IRequestHandler<ListCouponsQuery, Result<List<CouponDto>>>
+{
+    private readonly IRepository<CouponCode> _coupons;
+
+    public ListCouponsQueryHandler(IRepository<CouponCode> coupons) { _coupons = coupons; }
+
+    public async Task<Result<List<CouponDto>>> Handle(ListCouponsQuery query, CancellationToken ct)
+    {
+        var all = await _coupons.FindAsync(c => c.DeletedAt == null, ct);
+        var dtos = all.OrderByDescending(c => c.CreatedAt).Select(c => new CouponDto
+        {
+            Id = c.Id,
+            Code = c.Code,
+            Description = c.Description,
+            DiscountType = c.DiscountType.ToString(),
+            DiscountValue = c.DiscountValue,
+            MaxDiscountAmount = c.MaxDiscountAmount,
+            MinOrderAmount = c.MinOrderAmount,
+            MaxUses = c.MaxUses,
+            UsedCount = c.UsedCount,
+            ExpiresAt = c.ExpiresAt,
+            IsActive = c.IsActive,
+        }).ToList();
+        return Result<List<CouponDto>>.SuccessResult(dtos);
+    }
+}
+
 // ── Toggle Coupon ────────────────────────────────────────────────────────────
 public class ToggleCouponCommandHandler : IRequestHandler<ToggleCouponCommand, Result>
 {

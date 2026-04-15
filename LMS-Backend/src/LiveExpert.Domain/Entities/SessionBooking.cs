@@ -12,6 +12,7 @@ public class SessionBooking : BaseEntity
     public decimal BaseAmount { get; set; }
     public decimal PlatformFee { get; set; }
     public decimal PointsDiscount { get; set; }
+    public decimal CouponDiscount { get; set; }
     public decimal TotalAmount { get; set; }
     public bool AttendanceMarked { get; set; }
     public bool Attended { get; set; }

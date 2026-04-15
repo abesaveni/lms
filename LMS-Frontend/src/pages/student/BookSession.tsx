@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Clock, User } from 'lucide-react'
+import { Clock, User, Tag, Gift, Zap, CheckCircle2, AlertCircle } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import { bookSession, getSessionById, getSessionPricing, SessionDetailDto } from '../../services/sessionsApi'
+import { validateCoupon, CouponValidationResult } from '../../services/couponsApi'
 import { verifySessionPayment } from '../../services/paymentsApi'
+import { getBonusPointsSummary } from '../../services/bonusPointsApi'
 
 const BookSession = () => {
   const navigate = useNavigate()
@@ -18,40 +20,50 @@ const BookSession = () => {
   const [bookingError, setBookingError] = useState<string | null>(null)
   const [bookingSuccess, setBookingSuccess] = useState(false)
 
+  // Coupon state
+  const [couponInput, setCouponInput] = useState('')
+  const [couponValidating, setCouponValidating] = useState(false)
+  const [couponResult, setCouponResult] = useState<CouponValidationResult | null>(null)
+  const [couponError, setCouponError] = useState<string | null>(null)
+
+  // Bonus points state
+  const [availablePoints, setAvailablePoints] = useState(0)
+  const [usePoints, setUsePoints] = useState(false)
+  const [specialInstructions, setSpecialInstructions] = useState('')
+  const [goals, setGoals] = useState('')
+
   useEffect(() => {
     const loadSession = async () => {
       if (!sessionId) return
       try {
         const data = await getSessionById(sessionId)
         setSession(data)
-
-        // Auto-fill date and time from the dynamic session data
         if (data.scheduledAt) {
           const dateObj = new Date(data.scheduledAt)
-          const dateStr = dateObj.toISOString().split('T')[0]
-          const timeStr = dateObj.toTimeString().split(' ')[0].substring(0, 5)
-          setSelectedDate(dateStr)
-          setSelectedTime(timeStr)
+          setSelectedDate(dateObj.toISOString().split('T')[0])
+          setSelectedTime(dateObj.toTimeString().split(' ')[0].substring(0, 5))
         }
       } catch (err: any) {
         setBookingError(err.message || 'Failed to load session')
       }
     }
+    const loadPoints = async () => {
+      try {
+        const summary = await getBonusPointsSummary()
+        setAvailablePoints(summary.totalPoints || 0)
+      } catch { /* no points = 0 */ }
+    }
     loadSession()
+    loadPoints()
   }, [sessionId])
 
   useEffect(() => {
     const loadPricing = async () => {
       if (!sessionId || !session) return
       try {
-        const data = await getSessionPricing(
-          sessionId,
-          session.pricingType === 'Hourly' ? hours : undefined
-        )
+        const data = await getSessionPricing(sessionId, session.pricingType === 'Hourly' ? hours : undefined)
         setPricing(data)
-      } catch (err: any) {
-        setPricing(null)
-      }
+      } catch { setPricing(null) }
     }
     loadPricing()
   }, [sessionId, session, hours])
@@ -60,14 +72,43 @@ const BookSession = () => {
     ? new Date() > new Date(new Date(session.scheduledAt).getTime() + (session.duration || 60) * 60000)
     : false
 
+  // Flash sale helpers
+  const isFlashSaleActive = session?.flashSalePrice != null && session.flashSaleEndsAt
+    ? new Date(session.flashSaleEndsAt) > new Date()
+    : false
+  const effectiveBasePrice = isFlashSaleActive ? (session!.flashSalePrice ?? session!.basePrice) : (session?.basePrice ?? 0)
+
+  // Final amount calculation (coupon + points)
+  const baseForCalc = pricing?.baseAmount ?? effectiveBasePrice
+  const platformFee = pricing?.platformFee ?? 0
+  const couponDiscount = couponResult?.isValid ? couponResult.discountAmount : 0
+  const pointsDiscount = usePoints ? Math.min(availablePoints, baseForCalc) : 0
+  const finalAmount = Math.max(0, baseForCalc + platformFee - couponDiscount - pointsDiscount)
+
+  const handleValidateCoupon = async () => {
+    if (!couponInput.trim()) return
+    setCouponValidating(true)
+    setCouponError(null)
+    setCouponResult(null)
+    try {
+      const result = await validateCoupon(couponInput, baseForCalc, session?.tutorId)
+      setCouponResult(result)
+      if (!result.isValid) setCouponError(result.message)
+    } catch (err: any) {
+      setCouponError(err.message || 'Failed to validate coupon')
+    } finally {
+      setCouponValidating(false)
+    }
+  }
+
   const handleBooking = async () => {
     setBookingError(null)
-    if (!sessionId || !session || !pricing) {
-      setBookingError('Session details missing. Please refresh the page.')
+    if (!sessionId || !session) {
+      setBookingError('Session details missing. Please refresh.')
       return
     }
     if (isSessionExpired) {
-      setBookingError('This session has already ended and is no longer available for booking.')
+      setBookingError('This session has already ended and is no longer bookable.')
       return
     }
     setIsPaying(true)
@@ -75,9 +116,13 @@ const BookSession = () => {
       const booking = await bookSession({
         sessionId,
         hours: session.pricingType === 'Hourly' ? hours : undefined,
+        usePoints,
+        couponCode: couponResult?.isValid ? couponInput : undefined,
+        specialInstructions: specialInstructions || undefined,
+        goals: goals || undefined,
       })
 
-      // Free session — backend already confirmed it, no payment needed
+      // Free / fully-covered booking
       if (!booking.razorpayOrderId) {
         setBookingSuccess(true)
         setTimeout(() => navigate('/student/my-sessions'), 2000)
@@ -102,10 +147,10 @@ const BookSession = () => {
 
     const options = {
       key: booking.razorpayKey,
-      amount: Math.round((booking.totalAmount || pricing?.totalAmount || 0) * 100),
+      amount: Math.round(finalAmount * 100),
       currency: 'INR',
       name: 'LiveExpert.ai',
-      description: 'Session Booking',
+      description: session?.title || 'Session Booking',
       order_id: booking.razorpayOrderId,
       handler: async (response: any) => {
         try {
@@ -122,28 +167,22 @@ const BookSession = () => {
           setIsPaying(false)
         }
       },
-      modal: {
-        ondismiss: () => setIsPaying(false),
-      },
+      modal: { ondismiss: () => setIsPaying(false) },
     }
 
     const rzp = new (window as any).Razorpay(options)
     rzp.open()
   }
 
-  const loadRazorpayScript = (): Promise<boolean> => {
-    return new Promise((resolve) => {
-      if ((window as any).Razorpay) {
-        resolve(true)
-        return
-      }
+  const loadRazorpayScript = (): Promise<boolean> =>
+    new Promise((resolve) => {
+      if ((window as any).Razorpay) { resolve(true); return }
       const script = document.createElement('script')
       script.src = 'https://checkout.razorpay.com/v1/checkout.js'
       script.onload = () => resolve(true)
       script.onerror = () => resolve(false)
       document.body.appendChild(script)
     })
-  }
 
   if (!sessionId) {
     return (
@@ -162,167 +201,221 @@ const BookSession = () => {
       </div>
 
       {bookingSuccess && (
-        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700 font-medium">
-          Payment successful! Booking request submitted. Redirecting to My Sessions...
+        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl text-green-700 font-semibold flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5" />
+          Booking confirmed! Redirecting to My Sessions…
         </div>
       )}
       {bookingError && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
           {bookingError}
         </div>
       )}
 
+      {/* Special indicators */}
+      {isFlashSaleActive && (
+        <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-xl flex items-center gap-2 text-orange-700 text-sm font-semibold">
+          <Zap className="w-4 h-4 fill-orange-500" />
+          Flash Sale! Price ₹{session!.flashSalePrice} (was ₹{session!.basePrice}) — ends {new Date(session!.flashSaleEndsAt!).toLocaleTimeString()}
+        </div>
+      )}
+      {session?.instantBooking && (
+        <div className="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-xl flex items-center gap-2 text-indigo-700 text-sm font-semibold">
+          <Zap className="w-4 h-4" />
+          Instant Booking — your spot is confirmed immediately after payment.
+        </div>
+      )}
+
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Booking Form */}
-        <div className="lg:col-span-2 space-y-6">
+        {/* Form */}
+        <div className="lg:col-span-2 space-y-5">
+
+          {/* Session Info */}
           <Card>
-            <CardHeader>
-              <CardTitle>Session Details</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>Session Details</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">{session?.title || 'Session'}</h3>
-                <div className="flex items-center gap-4 text-sm text-gray-600">
-                  <div className="flex items-center gap-1">
-                    <User className="w-4 h-4" />
-                    {session?.tutorName || 'Tutor'}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-4 h-4" />
-                    {session?.duration ? `${session.duration} min` : '—'}
-                  </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-1">{session?.title || 'Session'}</h3>
+                <div className="flex items-center gap-4 text-sm text-gray-500">
+                  <span className="flex items-center gap-1"><User className="w-4 h-4" />{session?.tutorName || 'Tutor'}</span>
+                  <span className="flex items-center gap-1"><Clock className="w-4 h-4" />{session?.duration ? `${session.duration} min` : '—'}</span>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Date
-                </label>
-                <input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  disabled={!!sessionId}
-                  min={new Date().toISOString().split('T')[0]}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-50"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Time
-                </label>
-                <select
-                  value={selectedTime}
-                  onChange={(e) => setSelectedTime(e.target.value)}
-                  disabled={!!sessionId}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-50"
-                >
-                  <option value="">Select time</option>
-                  {!sessionId ? (
-                    <>
-                      <option value="10:00">10:00 AM</option>
-                      <option value="14:00">2:00 PM</option>
-                      <option value="16:00">4:00 PM</option>
-                    </>
-                  ) : (
-                    <option value={selectedTime}>{selectedTime}</option>
-                  )}
-                </select>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Date</label>
+                  <input type="date" value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    disabled={!!sessionId}
+                    min={new Date().toISOString().split('T')[0]}
+                    className="w-full px-3 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-gray-50 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Time</label>
+                  <input type="text" value={selectedTime} readOnly
+                    className="w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-600"
+                  />
+                </div>
               </div>
 
               {session?.pricingType === 'Hourly' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Duration (hours)
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={hours}
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Duration (hours)</label>
+                  <input type="number" min={1} value={hours}
                     onChange={(e) => setHours(Number(e.target.value || 1))}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="w-full px-3 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-400 text-sm"
                   />
                 </div>
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Special Notes (Optional)
-                </label>
-                <textarea
-                  rows={4}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  placeholder="Any special requirements or topics you'd like to focus on..."
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Learning Goals (optional)</label>
+                <input type="text" placeholder="What do you want to learn?"
+                  value={goals} onChange={(e) => setGoals(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-400 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Special Notes (optional)</label>
+                <textarea rows={3}
+                  value={specialInstructions} onChange={(e) => setSpecialInstructions(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-400 text-sm"
+                  placeholder="Any special requirements or topics to focus on…"
                 />
               </div>
             </CardContent>
           </Card>
 
+          {/* Discounts */}
           <Card>
-            <CardHeader>
-              <CardTitle>Payment</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>Discounts & Savings</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600">Session Fee</span>
-                <span className="text-lg font-bold text-gray-900">₹{pricing?.baseAmount ?? 0}</span>
+
+              {/* Coupon Code */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5 flex items-center gap-1.5">
+                  <Tag className="w-3.5 h-3.5 text-indigo-500" />
+                  Coupon Code
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Enter promo code (e.g. WELCOME20)"
+                    value={couponInput}
+                    onChange={(e) => { setCouponInput(e.target.value.toUpperCase()); setCouponResult(null); setCouponError(null) }}
+                    className="flex-1 px-3 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-400 text-sm font-mono uppercase"
+                  />
+                  <Button size="sm" variant="outline" onClick={handleValidateCoupon} isLoading={couponValidating}
+                    disabled={!couponInput.trim()}>
+                    Apply
+                  </Button>
+                </div>
+                {couponResult?.isValid && (
+                  <p className="text-xs text-green-600 font-semibold mt-1.5 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" />{couponResult.message}
+                  </p>
+                )}
+                {couponError && !couponResult?.isValid && (
+                  <p className="text-xs text-red-500 mt-1.5">{couponError}</p>
+                )}
               </div>
-              <div className="flex items-center justify-between text-sm text-gray-600">
-                <span>Platform Fee</span>
-                <span>₹{pricing?.platformFee ?? 0}</span>
+
+              {/* Bonus Points */}
+              {availablePoints > 0 && (
+                <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border border-gray-100 bg-amber-50/50 hover:bg-amber-50 transition-colors">
+                  <input type="checkbox" checked={usePoints} onChange={(e) => setUsePoints(e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-400"
+                  />
+                  <div className="flex items-center gap-2">
+                    <Gift className="w-4 h-4 text-amber-500" />
+                    <span className="text-sm font-semibold text-gray-800">
+                      Use {availablePoints} bonus points (saves ₹{Math.min(availablePoints, baseForCalc)})
+                    </span>
+                  </div>
+                </label>
+              )}
+
+            </CardContent>
+          </Card>
+
+          {/* Payment CTA */}
+          <Card>
+            <CardHeader><CardTitle>Payment</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>Session Fee {isFlashSaleActive && <span className="text-orange-500 font-bold ml-1">🔥 Sale</span>}</span>
+                <span className="font-semibold text-gray-900">
+                  {isFlashSaleActive
+                    ? <><s className="text-gray-400 mr-1">₹{session!.basePrice}</s> ₹{session!.flashSalePrice}</>
+                    : `₹${pricing?.baseAmount ?? effectiveBasePrice}`}
+                </span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-900 font-semibold">Payable</span>
-                <span className="text-lg font-bold text-gray-900">₹{pricing?.totalAmount ?? 0}</span>
+              {platformFee > 0 && (
+                <div className="flex justify-between text-xs text-gray-400">
+                  <span>Platform Fee (first booking)</span>
+                  <span>₹{platformFee}</span>
+                </div>
+              )}
+              {couponDiscount > 0 && (
+                <div className="flex justify-between text-xs text-green-600 font-semibold">
+                  <span>Coupon Discount ({couponInput})</span>
+                  <span>-₹{couponDiscount.toFixed(2)}</span>
+                </div>
+              )}
+              {pointsDiscount > 0 && (
+                <div className="flex justify-between text-xs text-amber-600 font-semibold">
+                  <span>Bonus Points</span>
+                  <span>-₹{pointsDiscount}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-base font-bold text-gray-900 border-t border-gray-100 pt-3">
+                <span>Total Payable</span>
+                <span>₹{finalAmount.toFixed(2)}</span>
               </div>
-              <Button fullWidth onClick={handleBooking} disabled={isPaying || !pricing || isSessionExpired}>
-                {isPaying ? 'Processing...' : 'Pay & Confirm Booking'}
+              <Button fullWidth onClick={handleBooking}
+                disabled={isPaying || !session || isSessionExpired}
+                className="mt-1">
+                {isPaying ? 'Processing…' : finalAmount === 0 ? 'Confirm Free Booking' : `Pay ₹${finalAmount.toFixed(2)}`}
               </Button>
             </CardContent>
           </Card>
         </div>
 
-        {/* Summary */}
+        {/* Summary sidebar */}
         <div>
           <Card className="sticky top-4">
-            <CardHeader>
-              <CardTitle>Booking Summary</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Session</span>
-                  <span className="font-medium text-gray-900">{session?.title || 'Session'}</span>
+            <CardHeader><CardTitle>Summary</CardTitle></CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Session</span>
+                <span className="font-semibold text-right max-w-[140px] truncate">{session?.title || '—'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Tutor</span>
+                <span className="font-semibold">{session?.tutorName || '—'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Duration</span>
+                <span className="font-semibold">
+                  {session?.pricingType === 'Hourly' ? `${hours} hr` : `${session?.duration || 0} min`}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Date</span>
+                <span className="font-semibold">{selectedDate || '—'}</span>
+              </div>
+              {session?.requiresSubscription && (
+                <div className="p-2 bg-indigo-50 rounded-lg text-indigo-700 text-xs font-medium">
+                  Subscription required for this session.
                 </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Tutor</span>
-                  <span className="font-medium text-gray-900">{session?.tutorName || 'Tutor'}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Duration</span>
-                  <span className="font-medium text-gray-900">
-                    {session?.pricingType === 'Hourly' ? `${hours} hours` : `${session?.duration || 0} min`}
-                  </span>
-                </div>
-                <div className="pt-3 border-t border-gray-200">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Session Fee</span>
-                    <span className="text-lg font-bold text-gray-900">₹{pricing?.baseAmount ?? 0}</span>
-                  </div>
-                    <div className="flex flex-col gap-1 mt-2">
-                      <div className="flex items-center justify-between text-sm text-gray-600">
-                        <span>Platform Fee</span>
-                        <span>₹{pricing?.platformFee ?? 0}</span>
-                      </div>
-                      {pricing?.platformFee && pricing.platformFee > 0 && (
-                        <p className="text-[11px] text-red-600 font-medium">Note: This platform fee is charged only for your first session.</p>
-                      )}
-                    </div>
-                  <div className="flex items-center justify-between mt-2">
-                    <span className="text-gray-900 font-semibold">Payable</span>
-                    <span className="text-lg font-bold text-gray-900">₹{pricing?.totalAmount ?? 0}</span>
-                  </div>
+              )}
+              <div className="border-t border-gray-100 pt-3">
+                <div className="flex justify-between font-bold text-gray-900">
+                  <span>Total</span>
+                  <span>₹{finalAmount.toFixed(2)}</span>
                 </div>
               </div>
             </CardContent>

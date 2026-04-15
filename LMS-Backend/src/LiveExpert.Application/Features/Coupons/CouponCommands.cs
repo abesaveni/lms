@@ -25,6 +25,9 @@ public class ToggleCouponCommand : IRequest<Result>
     public bool IsActive { get; set; }
 }
 
+// ── Admin: List All Coupons ────────────────────────────────────────────────────
+public class ListCouponsQuery : IRequest<Result<List<CouponDto>>> { }
+
 // ── Student: Validate + Apply Coupon ──────────────────────────────────────────
 public class ValidateCouponQuery : IRequest<Result<CouponValidationResult>>
 {

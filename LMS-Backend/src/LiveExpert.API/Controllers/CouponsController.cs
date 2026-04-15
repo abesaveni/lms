@@ -13,6 +13,13 @@ public class CouponsController : BaseController
 {
     public CouponsController(IMediator mediator) : base(mediator) { }
 
+    // ── Admin: List Coupons ────────────────────────────────────────────────────
+    /// <summary>GET /api/coupons — returns all coupons for admin management.</summary>
+    [HttpGet]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> List()
+        => HandleResult(await _mediator.Send(new ListCouponsQuery()));
+
     // ── Admin: Create Coupon ───────────────────────────────────────────────────
     /// <summary>
     /// Admin creates a promo coupon.

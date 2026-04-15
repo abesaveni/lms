@@ -81,6 +81,7 @@ import CreateEditCourse from './pages/tutor/CreateEditCourse'
 import CourseEnrollments from './pages/tutor/CourseEnrollments'
 import SubjectRates from './pages/tutor/SubjectRates'
 import AdminAITools from './pages/admin/AITools'
+import CouponManagement from './pages/admin/CouponManagement'
 
 function App() {
   // Check token expiration periodically and on mount
@@ -203,6 +204,7 @@ function App() {
           <Route path="/admin/subjects" element={<ProtectedRoute requiredRole="admin"><DashboardLayout role="admin"><SubjectManagement /></DashboardLayout></ProtectedRoute>} />
           <Route path="/admin/inbox" element={<ProtectedRoute requiredRole="admin"><DashboardLayout role="admin"><AdminInbox /></DashboardLayout></ProtectedRoute>} />
           <Route path="/admin/ai-tools" element={<ProtectedRoute requiredRole="admin"><DashboardLayout role="admin"><AdminAITools /></DashboardLayout></ProtectedRoute>} />
+          <Route path="/admin/coupons" element={<ProtectedRoute requiredRole="admin"><DashboardLayout role="admin"><CouponManagement /></DashboardLayout></ProtectedRoute>} />
           <Route path="/admin/notifications" element={<ProtectedRoute requiredRole="admin"><DashboardLayout role="admin"><Notifications /></DashboardLayout></ProtectedRoute>} />
         </Routes>
       </Router>

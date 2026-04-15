@@ -19,6 +19,8 @@ public class BookSessionCommandHandler : IRequestHandler<BookSessionCommand, Res
     private readonly IRepository<BonusPoint> _bonusPointRepository;
     private readonly IRepository<User> _userRepository;
     private readonly IRepository<StudentSubscription> _subscriptionRepository;
+    private readonly IRepository<CouponCode> _couponRepository;
+    private readonly IRepository<CouponUsage> _couponUsageRepository;
     private readonly ICurrentUserService _currentUserService;
     private readonly INotificationService _notificationHelper;
     private readonly IEmailService _emailService;
@@ -39,6 +41,8 @@ public class BookSessionCommandHandler : IRequestHandler<BookSessionCommand, Res
         IRepository<BonusPoint> bonusPointRepository,
         IRepository<User> userRepository,
         IRepository<StudentSubscription> subscriptionRepository,
+        IRepository<CouponCode> couponRepository,
+        IRepository<CouponUsage> couponUsageRepository,
         ICurrentUserService currentUserService,
         INotificationService notificationService,
         IEmailService emailService,
@@ -58,6 +62,8 @@ public class BookSessionCommandHandler : IRequestHandler<BookSessionCommand, Res
         _bonusPointRepository = bonusPointRepository;
         _userRepository = userRepository;
         _subscriptionRepository = subscriptionRepository;
+        _couponRepository = couponRepository;
+        _couponUsageRepository = couponUsageRepository;
         _currentUserService = currentUserService;
         _notificationHelper = notificationService;
         _emailService = emailService;
@@ -205,7 +211,37 @@ public class BookSessionCommandHandler : IRequestHandler<BookSessionCommand, Res
                 }
             }
 
-            var totalAmount = baseAmount + platformFee - pointsDiscount;
+            // Apply coupon discount if provided
+            var couponDiscount = 0m;
+            CouponCode? appliedCoupon = null;
+            if (!string.IsNullOrWhiteSpace(request.CouponCode))
+            {
+                var upper = request.CouponCode.Trim().ToUpperInvariant();
+                var coupon = await _couponRepository.FirstOrDefaultAsync(
+                    c => c.Code == upper && c.IsActive, cancellationToken);
+
+                if (coupon != null
+                    && (!coupon.ExpiresAt.HasValue || coupon.ExpiresAt.Value > DateTime.UtcNow)
+                    && (!coupon.MaxUses.HasValue || coupon.UsedCount < coupon.MaxUses.Value)
+                    && (!coupon.MinOrderAmount.HasValue || baseAmount >= coupon.MinOrderAmount.Value)
+                    && (!coupon.TutorId.HasValue || coupon.TutorId == session.TutorId))
+                {
+                    // Check per-student one-time use
+                    var alreadyUsed = await _couponUsageRepository.FirstOrDefaultAsync(
+                        u => u.CouponId == coupon.Id && u.StudentId == userId.Value, cancellationToken);
+
+                    if (alreadyUsed == null)
+                    {
+                        couponDiscount = coupon.DiscountType == CouponDiscountType.Percentage
+                            ? Math.Min(baseAmount * coupon.DiscountValue / 100m, coupon.MaxDiscountAmount ?? decimal.MaxValue)
+                            : Math.Min(coupon.DiscountValue, baseAmount);
+                        couponDiscount = Math.Round(couponDiscount, 2);
+                        appliedCoupon = coupon;
+                    }
+                }
+            }
+
+            var totalAmount = baseAmount + platformFee - pointsDiscount - couponDiscount;
 
             // Feature: Apply flash sale price if active
             if (session.FlashSalePrice.HasValue && session.FlashSaleEndsAt.HasValue && session.FlashSaleEndsAt.Value > DateTime.UtcNow)
@@ -229,6 +265,7 @@ public class BookSessionCommandHandler : IRequestHandler<BookSessionCommand, Res
                 BaseAmount = baseAmount,
                 PlatformFee = platformFee,
                 PointsDiscount = pointsDiscount,
+                CouponDiscount = couponDiscount,
                 TotalAmount = totalAmount,
                 AttendanceMarked = false,
                 SpecialInstructions = request.SpecialInstructions,
@@ -240,6 +277,24 @@ public class BookSessionCommandHandler : IRequestHandler<BookSessionCommand, Res
             };
 
             await _bookingRepository.AddAsync(booking, cancellationToken);
+
+            // Record coupon usage and increment counter
+            if (appliedCoupon != null)
+            {
+                var usage = new CouponUsage
+                {
+                    Id = Guid.NewGuid(),
+                    CouponId = appliedCoupon.Id,
+                    StudentId = userId.Value,
+                    BookingId = booking.Id,
+                    DiscountApplied = couponDiscount,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+                await _couponUsageRepository.AddAsync(usage, cancellationToken);
+                appliedCoupon.UsedCount++;
+                await _couponRepository.UpdateAsync(appliedCoupon, cancellationToken);
+            }
 
             // Feature 23: Increment sessions-used counter on the active subscription
             if (activeSubscription != null)
@@ -298,6 +353,7 @@ public class BookSessionCommandHandler : IRequestHandler<BookSessionCommand, Res
                     BaseAmount = baseAmount,
                     PlatformFee = platformFee,
                     PointsDiscount = pointsDiscount,
+                    CouponDiscount = couponDiscount,
                     TotalAmount = 0,
                     RazorpayOrderId = null,
                     RazorpayKey = null,
@@ -437,6 +493,7 @@ public class BookSessionCommandHandler : IRequestHandler<BookSessionCommand, Res
                 BaseAmount = booking.BaseAmount,
                 PlatformFee = booking.PlatformFee,
                 PointsDiscount = booking.PointsDiscount,
+                CouponDiscount = booking.CouponDiscount,
                 TotalAmount = booking.TotalAmount,
                 RazorpayOrderId = orderId,
                 RazorpayKey = key,

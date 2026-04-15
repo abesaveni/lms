@@ -1863,6 +1863,9 @@ namespace LiveExpert.Infrastructure.Migrations
                     b.Property<decimal>("PointsDiscount")
                         .HasColumnType("TEXT");
 
+                    b.Property<decimal>("CouponDiscount")
+                        .HasColumnType("TEXT");
+
                     b.Property<decimal?>("RefundAmount")
                         .HasColumnType("TEXT");
 

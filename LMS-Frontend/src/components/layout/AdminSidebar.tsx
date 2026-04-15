@@ -13,6 +13,7 @@ import {
   BookOpen,
   Bell,
   Bot,
+  Tag,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 
@@ -67,6 +68,11 @@ const AdminSidebar = ({ currentPath }: AdminSidebarProps) => {
       label: 'Subject Management',
       path: '/admin/subjects',
       icon: BookOpen,
+    },
+    {
+      label: 'Coupons',
+      path: '/admin/coupons',
+      icon: Tag,
     },
     {
       label: 'Consent Management',

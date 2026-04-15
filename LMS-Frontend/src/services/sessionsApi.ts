@@ -16,6 +16,12 @@ export interface SessionDto {
   scheduledAt: string
   duration: number
   basePrice: number
+  effectivePrice?: number
+  flashSalePrice?: number
+  flashSaleEndsAt?: string
+  instantBooking?: boolean
+  noShowProtection?: boolean
+  requiresSubscription?: boolean
   maxStudents: number
   currentStudents: number
   status: string
@@ -40,6 +46,11 @@ export interface CreateSessionDto {
   basePrice: number
   maxStudents: number
   pricingType: string
+  requiresSubscription?: boolean
+  instantBooking?: boolean
+  noShowProtection?: boolean
+  flashSalePrice?: number
+  flashSaleEndsAt?: string
 }
 
 /**
@@ -220,9 +231,18 @@ export const getSessionPricing = async (sessionId: string, hours?: number): Prom
 /**
  * Book a session
  */
-export const bookSession = async (data: { sessionId: string; hours?: number }): Promise<any> => {
+export const bookSession = async (data: {
+  sessionId: string
+  hours?: number
+  usePoints?: boolean
+  couponCode?: string
+  specialInstructions?: string
+  goals?: string
+  currentLevel?: string
+  topics?: string
+}): Promise<any> => {
   const response = await apiPost<ApiResponse<any>>(`/sessions/${data.sessionId}/book`, data)
-  
+
   if (!response.success || !response.data) {
     throw new Error(response.error?.message || 'Failed to book session')
   }
