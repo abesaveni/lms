@@ -206,6 +206,9 @@ public class BookSessionCommandHandler : IRequestHandler<BookSessionCommand, Res
                 TotalAmount = totalAmount,
                 AttendanceMarked = false,
                 SpecialInstructions = request.SpecialInstructions,
+                Goals = request.Goals,
+                CurrentLevel = request.CurrentLevel,
+                Topics = request.Topics,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -429,6 +432,7 @@ public class CancelBookingCommandHandler : IRequestHandler<CancelBookingCommand,
     private readonly ICurrentUserService _currentUserService;
     private readonly INotificationService _notificationHelper;
     private readonly IRepository<User> _userRepository;
+    private readonly IRepository<SessionWaitlist> _waitlistRepository;
     private readonly IPaymentService _paymentService;
     private readonly IUnitOfWork _unitOfWork;
 
@@ -441,6 +445,7 @@ public class CancelBookingCommandHandler : IRequestHandler<CancelBookingCommand,
         ICurrentUserService currentUserService,
         INotificationService notificationService,
         IPaymentService paymentService,
+        IRepository<SessionWaitlist> waitlistRepository,
         IUnitOfWork unitOfWork)
     {
         _sessionRepository = sessionRepository;
@@ -451,6 +456,7 @@ public class CancelBookingCommandHandler : IRequestHandler<CancelBookingCommand,
         _currentUserService = currentUserService;
         _notificationHelper = notificationService;
         _paymentService = paymentService;
+        _waitlistRepository = waitlistRepository;
         _unitOfWork = unitOfWork;
     }
 
@@ -544,6 +550,36 @@ public class CancelBookingCommandHandler : IRequestHandler<CancelBookingCommand,
                     session.ScheduledAt,
                     studentName,
                     cancellationToken);
+            }
+
+            // Feature 8: Notify first waiting student if this is a group session
+            if (session.SessionType == Domain.Enums.SessionType.Group)
+            {
+                var firstWaiting = (await _waitlistRepository.FindAsync(
+                    w => w.SessionId == session.Id && w.Status == Domain.Enums.WaitlistStatus.Waiting,
+                    cancellationToken))
+                    .OrderBy(w => w.Position)
+                    .FirstOrDefault();
+
+                if (firstWaiting != null)
+                {
+                    firstWaiting.Status = Domain.Enums.WaitlistStatus.Notified;
+                    firstWaiting.NotifiedAt = DateTime.UtcNow;
+                    firstWaiting.UpdatedAt = DateTime.UtcNow;
+                    await _waitlistRepository.UpdateAsync(firstWaiting, cancellationToken);
+
+                    var waitingStudent = await _userRepository.GetByIdAsync(firstWaiting.StudentId, cancellationToken);
+                    if (waitingStudent != null)
+                    {
+                        await _notificationHelper.SendNotificationAsync(
+                            firstWaiting.StudentId,
+                            "Spot Available!",
+                            $"A spot has opened up in '{session.Title}'. Book now before it fills up!",
+                            Domain.Enums.NotificationType.SessionBooked,
+                            $"/sessions/{session.Id}",
+                            cancellationToken);
+                    }
+                }
             }
 
             await _unitOfWork.CommitTransactionAsync(cancellationToken);

@@ -307,6 +307,55 @@ public enum AutoPayoutSchedule
     Monthly     // 1st of month
 }
 
+// Feature 3: Assignments
+public enum SubmissionStatus
+{
+    Pending,
+    Submitted,
+    Graded
+}
+
+// Feature 8: Waitlist
+public enum WaitlistStatus
+{
+    Waiting,
+    Notified,
+    Expired,
+    Booked
+}
+
+// Feature 9: Session Bundles
+public enum BundleStatus
+{
+    Active,
+    Exhausted,
+    Expired
+}
+
+// Feature 10: Subscription Plans
+public enum SubscriptionStatus
+{
+    Active,
+    Expired,
+    Cancelled
+}
+
+// Feature 12: Pre-booking Inquiry
+public enum InquiryStatus
+{
+    Pending,
+    Replied,
+    Closed
+}
+
+// Feature 14: Learning Paths
+public enum LearningEnrollmentStatus
+{
+    Active,
+    Completed,
+    Dropped
+}
+
 public enum BillingTransactionType
 {
     SessionBooking,

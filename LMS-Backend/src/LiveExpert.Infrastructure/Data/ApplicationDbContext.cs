@@ -98,6 +98,38 @@ public class ApplicationDbContext : DbContext
     public DbSet<UserChallengeAttempt> UserChallengeAttempts { get; set; }
     public DbSet<UserChallengeStreak> UserChallengeStreaks { get; set; }
 
+    // Feature 2: Session Notes
+    public DbSet<SessionNote> SessionNotes { get; set; }
+
+    // Feature 3: Assignments
+    public DbSet<SessionAssignment> SessionAssignments { get; set; }
+    public DbSet<AssignmentSubmission> AssignmentSubmissions { get; set; }
+
+    // Feature 4: Student Ratings
+    public DbSet<StudentRating> StudentRatings { get; set; }
+
+    // Feature 6: Tutor Availability
+    public DbSet<TutorAvailability> TutorAvailabilities { get; set; }
+
+    // Feature 8: Waitlist
+    public DbSet<SessionWaitlist> SessionWaitlists { get; set; }
+
+    // Feature 9: Bundles
+    public DbSet<SessionBundle> SessionBundles { get; set; }
+    public DbSet<BundlePurchase> BundlePurchases { get; set; }
+
+    // Feature 10: Subscription Plans
+    public DbSet<SubscriptionPlan> SubscriptionPlans { get; set; }
+    public DbSet<StudentSubscription> StudentSubscriptions { get; set; }
+
+    // Feature 12: Inquiries
+    public DbSet<TutorInquiry> TutorInquiries { get; set; }
+
+    // Feature 14: Learning Paths
+    public DbSet<LearningPath> LearningPaths { get; set; }
+    public DbSet<LearningPathStep> LearningPathSteps { get; set; }
+    public DbSet<LearningPathEnrollment> LearningPathEnrollments { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

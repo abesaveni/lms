@@ -60,6 +60,7 @@ public static class DependencyInjection
         // Background Services
         services.AddHostedService<SessionReminderBackgroundService>();
         services.AddHostedService<TutorVerificationReminderService>();
+        services.AddHostedService<BookingAutoExpireService>(); // Feature 7
 
         // Hangfire — background job queue for notifications (email, WhatsApp)
         // MemoryStorage: jobs survive SMTP blips but are lost on process restart (acceptable for notifications)

@@ -20,6 +20,11 @@ public class SessionBooking : BaseEntity
     public DateTime? LeftAt { get; set; }
     public string? SpecialInstructions { get; set; }
     public string? CancellationReason { get; set; }
+
+    // Feature 1: Pre-session questionnaire
+    public string? Goals { get; set; }
+    public string? CurrentLevel { get; set; }
+    public string? Topics { get; set; }
     public decimal? RefundAmount { get; set; }
     public DateTime? RefundProcessedAt { get; set; }
     public Guid? PaymentId { get; set; }

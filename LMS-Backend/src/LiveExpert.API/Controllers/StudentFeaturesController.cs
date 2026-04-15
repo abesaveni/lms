@@ -1,4 +1,6 @@
 using LiveExpert.API.Services;
+using LiveExpert.Application.Features.Students.Queries;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -105,11 +107,13 @@ public class StudentFeaturesController : ControllerBase
 {
     private readonly ClaudeAIService _ai;
     private readonly ILogger<StudentFeaturesController> _logger;
+    private readonly IMediator _mediator;
 
-    public StudentFeaturesController(ClaudeAIService ai, ILogger<StudentFeaturesController> logger)
+    public StudentFeaturesController(ClaudeAIService ai, ILogger<StudentFeaturesController> logger, IMediator mediator)
     {
         _ai = ai;
         _logger = logger;
+        _mediator = mediator;
     }
 
     // ── 1. Career Path ────────────────────────────────────────────────────────
@@ -624,6 +628,70 @@ Return ONLY the JSON object. No markdown.";
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error generating weekly digest");
+            return StatusCode(500, new { error = ex.Message });
+        }
+    }
+
+    // ── Feature 5: Recent Tutors (Re-book) ───────────────────────────────────
+    [HttpGet("recent-tutors")]
+    public async Task<IActionResult> GetRecentTutors(CancellationToken ct)
+    {
+        try
+        {
+            var result = await _mediator.Send(new GetRecentTutorsQuery(), ct);
+            if (result.Success) return Ok(result);
+            return result.Error?.Code switch
+            {
+                "UNAUTHORIZED" => Unauthorized(result),
+                "NOT_FOUND" => NotFound(result),
+                _ => BadRequest(result)
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting recent tutors");
+            return StatusCode(500, new { error = ex.Message });
+        }
+    }
+
+    // ── Feature 11: Recommended Tutors ───────────────────────────────────────
+    [HttpGet("recommended-tutors")]
+    public async Task<IActionResult> GetRecommendedTutors([FromQuery] Guid? subjectId, [FromQuery] int maxResults = 10, CancellationToken ct = default)
+    {
+        try
+        {
+            var result = await _mediator.Send(new GetRecommendedTutorsQuery { SubjectId = subjectId, MaxResults = maxResults }, ct);
+            if (result.Success) return Ok(result);
+            return result.Error?.Code switch
+            {
+                "UNAUTHORIZED" => Unauthorized(result),
+                _ => BadRequest(result)
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting recommended tutors");
+            return StatusCode(500, new { error = ex.Message });
+        }
+    }
+
+    // ── Feature 13: Student Progress ─────────────────────────────────────────
+    [HttpGet("progress")]
+    public async Task<IActionResult> GetProgress(CancellationToken ct)
+    {
+        try
+        {
+            var result = await _mediator.Send(new GetStudentProgressQuery(), ct);
+            if (result.Success) return Ok(result);
+            return result.Error?.Code switch
+            {
+                "UNAUTHORIZED" => Unauthorized(result),
+                _ => BadRequest(result)
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting student progress");
             return StatusCode(500, new { error = ex.Message });
         }
     }
