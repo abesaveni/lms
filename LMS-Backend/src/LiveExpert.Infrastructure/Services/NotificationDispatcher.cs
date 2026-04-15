@@ -1,5 +1,6 @@
 using LiveExpert.Application.Interfaces;
 using LiveExpert.Domain.Enums;
+using Microsoft.Extensions.Logging;
 
 namespace LiveExpert.Infrastructure.Services;
 
@@ -9,17 +10,20 @@ public class NotificationDispatcher : INotificationDispatcher
     private readonly INotificationService _notificationService;
     private readonly IEmailService _emailService;
     private readonly IWhatsAppService _whatsAppService;
+    private readonly ILogger<NotificationDispatcher> _logger;
 
     public NotificationDispatcher(
         INotificationPreferenceService preferenceService,
         INotificationService notificationService,
         IEmailService emailService,
-        IWhatsAppService whatsAppService)
+        IWhatsAppService whatsAppService,
+        ILogger<NotificationDispatcher> logger)
     {
         _preferenceService = preferenceService;
         _notificationService = notificationService;
         _emailService = emailService;
         _whatsAppService = whatsAppService;
+        _logger = logger;
     }
 
     public async Task SendAsync(NotificationDispatchRequest request, CancellationToken cancellationToken = default)
@@ -35,13 +39,20 @@ public class NotificationDispatcher : INotificationDispatcher
 
             if (canSend)
             {
-                await _notificationService.SendNotificationAsync(
-                    request.UserId,
-                    request.Title,
-                    request.Message,
-                    NotificationType.NewMessage,
-                    request.ActionUrl,
-                    cancellationToken);
+                try
+                {
+                    await _notificationService.SendNotificationAsync(
+                        request.UserId,
+                        request.Title,
+                        request.Message,
+                        NotificationType.NewMessage,
+                        request.ActionUrl,
+                        cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "In-app notification failed for user {UserId}", request.UserId);
+                }
             }
         }
 
@@ -57,7 +68,14 @@ public class NotificationDispatcher : INotificationDispatcher
 
             if (canSend)
             {
-                await _emailService.SendEmailAsync(request.EmailTo!, request.EmailSubject!, request.EmailBody!, request.EmailIsHtml);
+                try
+                {
+                    await _emailService.SendEmailAsync(request.EmailTo!, request.EmailSubject!, request.EmailBody!, request.EmailIsHtml);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Email notification failed to {EmailTo} — SMTP not configured", request.EmailTo);
+                }
             }
         }
 
@@ -73,16 +91,23 @@ public class NotificationDispatcher : INotificationDispatcher
 
             if (canSend)
             {
-                if (!string.IsNullOrWhiteSpace(request.WhatsAppTemplateName))
+                try
                 {
-                    await _whatsAppService.SendTemplateMessageAsync(
-                        request.WhatsAppTo!, 
-                        request.WhatsAppTemplateName!, 
-                        request.WhatsAppParameters ?? new List<string>());
+                    if (!string.IsNullOrWhiteSpace(request.WhatsAppTemplateName))
+                    {
+                        await _whatsAppService.SendTemplateMessageAsync(
+                            request.WhatsAppTo!,
+                            request.WhatsAppTemplateName!,
+                            request.WhatsAppParameters ?? new List<string>());
+                    }
+                    else if (!string.IsNullOrWhiteSpace(request.WhatsAppMessage))
+                    {
+                        await _whatsAppService.SendMessageAsync(request.WhatsAppTo!, request.WhatsAppMessage!);
+                    }
                 }
-                else if (!string.IsNullOrWhiteSpace(request.WhatsAppMessage))
+                catch (Exception ex)
                 {
-                    await _whatsAppService.SendMessageAsync(request.WhatsAppTo!, request.WhatsAppMessage!);
+                    _logger.LogWarning(ex, "WhatsApp notification failed to {WhatsAppTo}", request.WhatsAppTo);
                 }
             }
         }
