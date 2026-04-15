@@ -1,4 +1,5 @@
 using Hangfire.Dashboard;
+using Microsoft.AspNetCore.Http;
 using System.Text;
 
 namespace LiveExpert.API.Middleware;
@@ -22,9 +23,9 @@ public class HangfireBasicAuthFilter : IDashboardAuthorizationFilter
     public bool Authorize(DashboardContext context)
     {
         var httpContext = context.GetHttpContext();
+        var authHeader = httpContext.Request.Headers.Authorization.ToString();
 
-        var header = httpContext.Request.Headers["Authorization"].FirstOrDefault();
-        if (string.IsNullOrWhiteSpace(header) || !header.StartsWith("Basic ", StringComparison.OrdinalIgnoreCase))
+        if (!authHeader.StartsWith("Basic ", StringComparison.OrdinalIgnoreCase))
         {
             Challenge(httpContext);
             return false;
@@ -32,21 +33,19 @@ public class HangfireBasicAuthFilter : IDashboardAuthorizationFilter
 
         try
         {
-            var encoded = header["Basic ".Length..].Trim();
-            var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(encoded));
-            var colon   = decoded.IndexOf(':');
-            if (colon < 0) { Challenge(httpContext); return false; }
+            var credentials = Encoding.UTF8
+                .GetString(Convert.FromBase64String(authHeader["Basic ".Length..].Trim()));
 
-            var user = decoded[..colon];
-            var pass = decoded[(colon + 1)..];
+            var colon = credentials.IndexOf(':');
+            if (colon < 1) { Challenge(httpContext); return false; }
 
-            if (string.Equals(user, _username, StringComparison.Ordinal) &&
-                string.Equals(pass, _password, StringComparison.Ordinal))
-            {
+            var user = credentials[..colon];
+            var pass = credentials[(colon + 1)..];
+
+            if (user == _username && pass == _password)
                 return true;
-            }
         }
-        catch { /* malformed header */ }
+        catch { /* malformed Base64 */ }
 
         Challenge(httpContext);
         return false;
@@ -55,6 +54,6 @@ public class HangfireBasicAuthFilter : IDashboardAuthorizationFilter
     private static void Challenge(HttpContext ctx)
     {
         ctx.Response.StatusCode = 401;
-        ctx.Response.Headers["WWW-Authenticate"] = "Basic realm=\"Hangfire Dashboard\"";
+        ctx.Response.Headers.Append("WWW-Authenticate", "Basic realm=\"Hangfire Dashboard\"");
     }
 }

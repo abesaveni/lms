@@ -287,7 +287,7 @@ app.UseHangfireDashboard(hangfirePath, new DashboardOptions
     },
     IgnoreAntiforgeryToken = true
 });
-Console.WriteLine($"✓ Hangfire dashboard: {hangfirePath} (user: {hangfireUser})");
+Console.WriteLine($"✓ Hangfire dashboard: {hangfirePath} (user: '{hangfireUser}', pass length: {hangfirePassword.Length})");
 
 // Don't use HTTPS redirection in development as it can interfere with CORS
 if (!app.Environment.IsDevelopment())
