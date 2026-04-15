@@ -70,7 +70,7 @@ public class ListCouponsQueryHandler : IRequestHandler<ListCouponsQuery, Result<
 
     public async Task<Result<List<CouponDto>>> Handle(ListCouponsQuery query, CancellationToken ct)
     {
-        var all = await _coupons.FindAsync(c => c.DeletedAt == null, ct);
+        var all = await _coupons.FindAsync(c => true, ct);
         var dtos = all.OrderByDescending(c => c.CreatedAt).Select(c => new CouponDto
         {
             Id = c.Id,
