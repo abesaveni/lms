@@ -356,7 +356,7 @@ public static class DbInitializer
                 {
                     Id = Guid.NewGuid(),
                     SettingKey = "ReferralBonusCredits",
-                    SettingValue = "500.00",
+                    SettingValue = "50.00",
                     DataType = "Decimal",
                     Description = "Bonus points awarded for successful referrals",
                     IsEncrypted = false,

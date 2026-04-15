@@ -247,24 +247,51 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, Result<Re
                 return;
             }
 
-            // Referral bonus released after referred student books a session
-            var referralBonus = await _settingsService.GetReferralBonusCreditsAsync();
+            // Award 50 points immediately when referred user registers
+            const decimal referralBonus = 50m;
 
-            // Create referral program record (status: Pending - will be rewarded on first booking)
             var referralProgram = new ReferralProgram
             {
                 Id = Guid.NewGuid(),
                 ReferrerId = referrerId,
                 ReferredUserId = newUserId,
                 ReferralCode = normalizedCode,
-                Status = "Pending", // Will be changed to "Completed" when referred user makes first purchase
+                Status = "Completed",
                 RewardCredits = referralBonus,
                 JoiningBonusAmount = 0,
+                ReferralBonusPaidAt = DateTime.UtcNow,
+                RewardedAt = DateTime.UtcNow,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
 
             await _referralRepository.AddAsync(referralProgram, cancellationToken);
+
+            // Credit 50 points to the referrer's wallet immediately
+            var bonusPoint = new BonusPoint
+            {
+                Id = Guid.NewGuid(),
+                UserId = referrerId,
+                Points = 50,
+                Reason = BonusPointReason.Referral,
+                ReferenceId = newUserId,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            await _bonusPointRepository.AddAsync(bonusPoint, cancellationToken);
+
+            // Notify the referrer
+            try
+            {
+                await _notificationService.SendNotificationAsync(
+                    referrerId,
+                    "Referral Bonus Earned! 🎉",
+                    "You earned 50 points because someone signed up using your referral code.",
+                    NotificationType.ReferralBonus,
+                    null,
+                    cancellationToken);
+            }
+            catch { /* notification failure should not block registration */ }
         }
         catch
         {

@@ -70,7 +70,7 @@ public class SystemSettingsService : ISystemSettingsService
 
     public async Task<decimal> GetReferralBonusCreditsAsync()
     {
-        return await GetSettingAsync<decimal>("ReferralBonusCredits", 500.0m);
+        return await GetSettingAsync<decimal>("ReferralBonusCredits", 50.0m);
     }
 
     public async Task<decimal> GetRegistrationBonusCreditsAsync()

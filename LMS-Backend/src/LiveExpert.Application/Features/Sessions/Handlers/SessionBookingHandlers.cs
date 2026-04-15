@@ -364,47 +364,8 @@ public class BookSessionCommandHandler : IRequestHandler<BookSessionCommand, Res
 
     private async Task TryReleaseReferralBonusesAsync(Guid studentId, Guid sessionId, CancellationToken cancellationToken)
     {
-        var referral = await _referralRepository.FirstOrDefaultAsync(
-            r => r.ReferredUserId == studentId && r.Status == "Pending",
-            cancellationToken);
-
-        if (referral == null)
-        {
-            return;
-        }
-
-        if (referral.ReferralBonusPaidAt == null)
-        {
-            var bonusPoint = new BonusPoint
-            {
-                Id = Guid.NewGuid(),
-                UserId = referral.ReferrerId,
-                Points = (int)Math.Round(referral.RewardCredits),
-                Reason = BonusPointReason.Referral,
-                ReferenceId = sessionId,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            };
-
-            await _bonusPointRepository.AddAsync(bonusPoint, cancellationToken);
-            referral.ReferralBonusPaidAt = DateTime.UtcNow;
-
-            await _notificationHelper.SendNotificationAsync(
-                referral.ReferrerId,
-                "Referral Bonus Earned",
-                $"You earned {referral.RewardCredits:N0} points for a completed referral booking.",
-                NotificationType.ReferralBonus,
-                null,
-                cancellationToken);
-        }
-        if (referral.ReferralBonusPaidAt != null)
-        {
-            referral.Status = "Completed";
-            referral.RewardedAt = DateTime.UtcNow;
-        }
-
-        referral.UpdatedAt = DateTime.UtcNow;
-        await _referralRepository.UpdateAsync(referral, cancellationToken);
+        // Referral bonus is now awarded immediately on registration — nothing to do here
+        await Task.CompletedTask;
     }
 }
 
