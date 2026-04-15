@@ -66,7 +66,8 @@ public enum PaymentStatus
 public enum BonusPointReason
 {
     Registration,
-    Referral
+    Referral,
+    Redemption
 }
 
 public enum DisputeType
@@ -238,7 +239,8 @@ public enum EarningStatus
 {
     Pending,
     Available,
-    Paid
+    Paid,
+    Cancelled
 }
 
 public enum PayoutStatus

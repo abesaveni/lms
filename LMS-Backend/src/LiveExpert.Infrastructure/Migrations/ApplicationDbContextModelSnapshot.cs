@@ -1742,6 +1742,9 @@ namespace LiveExpert.Infrastructure.Migrations
                     b.Property<decimal>("PlatformFee")
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<decimal>("PointsDiscount")
+                        .HasColumnType("TEXT");
+
                     b.Property<decimal?>("RefundAmount")
                         .HasColumnType("TEXT");
 
@@ -2084,6 +2087,9 @@ namespace LiveExpert.Infrastructure.Migrations
                     b.Property<Guid?>("PayoutRequestId")
                         .HasColumnType("TEXT");
 
+                    b.Property<Guid?>("BookingId")
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid>("SourceId")
                         .HasColumnType("TEXT");
 
@@ -2301,6 +2307,9 @@ namespace LiveExpert.Infrastructure.Migrations
 
                     b.Property<decimal>("TrialPrice")
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("VerificationReminderSent")
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("TEXT");

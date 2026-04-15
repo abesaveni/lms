@@ -13,6 +13,7 @@ public interface ISystemSettingsService
     Task<decimal> GetPlatformFeePerHourAsync();
     Task<decimal> GetPlatformFeePercentageAsync();
     Task<decimal> GetMinWithdrawalAmountAsync();
+    Task<decimal> GetMaxPayoutPercentageAsync();
 }
 
 

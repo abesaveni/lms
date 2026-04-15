@@ -15,6 +15,7 @@ public class RequestWithdrawalCommandHandler : IRequestHandler<RequestWithdrawal
     private readonly IRepository<BankAccount> _bankAccountRepository;
     private readonly IRepository<User> _userRepository;
     private readonly ICurrentUserService _currentUserService;
+    private readonly ISystemSettingsService _settingsService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly INotificationService _notificationService;
 
@@ -24,6 +25,7 @@ public class RequestWithdrawalCommandHandler : IRequestHandler<RequestWithdrawal
         IRepository<BankAccount> bankAccountRepository,
         IRepository<User> userRepository,
         ICurrentUserService currentUserService,
+        ISystemSettingsService settingsService,
         IUnitOfWork unitOfWork,
         INotificationService notificationService)
     {
@@ -32,6 +34,7 @@ public class RequestWithdrawalCommandHandler : IRequestHandler<RequestWithdrawal
         _bankAccountRepository = bankAccountRepository;
         _userRepository = userRepository;
         _currentUserService = currentUserService;
+        _settingsService = settingsService;
         _unitOfWork = unitOfWork;
         _notificationService = notificationService;
     }
@@ -47,8 +50,9 @@ public class RequestWithdrawalCommandHandler : IRequestHandler<RequestWithdrawal
             return Result<Guid>.FailureResult("FORBIDDEN", "Only tutors can request withdrawals");
 
         // Check minimum withdrawal amount
-        if (request.Amount < 1000)
-            return Result<Guid>.FailureResult("INVALID_AMOUNT", "Minimum withdrawal amount is ₹1000");
+        var minAmount = await _settingsService.GetMinWithdrawalAmountAsync();
+        if (request.Amount < minAmount)
+            return Result<Guid>.FailureResult("INVALID_AMOUNT", $"Minimum withdrawal amount is ₹{minAmount}");
 
         // Verify bank account
         var bankAccount = await _bankAccountRepository.GetByIdAsync(request.BankAccountId, cancellationToken);
@@ -62,6 +66,13 @@ public class RequestWithdrawalCommandHandler : IRequestHandler<RequestWithdrawal
         var availableForWithdrawal = earnings.Sum(e => e.NetAmount);
         if (availableForWithdrawal < request.Amount)
             return Result<Guid>.FailureResult("INSUFFICIENT_BALANCE", "Insufficient earnings balance");
+
+        // Enforce MaxPayoutPercentage — tutor must retain at least (100 - maxPct)% of their balance
+        var maxPayoutPct = await _settingsService.GetMaxPayoutPercentageAsync();
+        var maxAllowed = Math.Round(availableForWithdrawal * (maxPayoutPct / 100m), 2);
+        if (request.Amount > maxAllowed)
+            return Result<Guid>.FailureResult("EXCEEDS_MAX_PAYOUT",
+                $"You can withdraw at most ₹{maxAllowed} ({maxPayoutPct}% of your available balance of ₹{availableForWithdrawal}).");
 
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
 

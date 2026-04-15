@@ -112,6 +112,7 @@ public class PaymentsController : ControllerBase
                 TutorId = payment.TutorId,
                 SourceType = "Session",
                 SourceId = payment.SessionId,
+                BookingId = booking?.Id,
                 Amount = payment.BaseAmount,
                 CommissionPercentage = commissionPercentage,
                 CommissionAmount = payment.PlatformFee,

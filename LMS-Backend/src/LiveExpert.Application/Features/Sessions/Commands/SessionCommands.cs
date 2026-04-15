@@ -43,6 +43,8 @@ public class BookSessionCommand : IRequest<Result<BookingDto>>
     public Guid SessionId { get; set; }
     public string? SpecialInstructions { get; set; }
     public int? Hours { get; set; }
+    /// <summary>When true, available bonus points are applied as a discount (1 point = ₹1).</summary>
+    public bool UsePoints { get; set; } = false;
 }
 
 // Cancel Booking Command
@@ -108,6 +110,7 @@ public class BookingDto
     public int? HoursBooked { get; set; }
     public decimal BaseAmount { get; set; }
     public decimal PlatformFee { get; set; }
+    public decimal PointsDiscount { get; set; }
     public decimal TotalAmount { get; set; }
     public string? RazorpayOrderId { get; set; }
     public string? RazorpayKey { get; set; }

@@ -51,10 +51,10 @@ public class SessionReminderBackgroundService : BackgroundService
         var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
         var dateTimeService = scope.ServiceProvider.GetRequiredService<IDateTimeService>();
 
-        var reminderThreshold = dateTimeService.UtcNow.AddMinutes(15);
+        var reminderThreshold = dateTimeService.UtcNow.AddMinutes(60);
         var now = dateTimeService.UtcNow;
 
-        // Find sessions starting in the next 15-20 minutes that haven't been reminded
+        // Find sessions starting in the next 60 minutes that haven't been reminded
         var upcomingSessions = await sessionRepository.FindAsync(s => 
             s.ScheduledAt > now && 
             s.ScheduledAt <= reminderThreshold && 

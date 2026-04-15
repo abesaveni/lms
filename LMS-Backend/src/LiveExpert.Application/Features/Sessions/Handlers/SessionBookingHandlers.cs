@@ -175,7 +175,22 @@ public class BookSessionCommandHandler : IRequestHandler<BookSessionCommand, Res
                 }
             }
 
-            var totalAmount = baseAmount + platformFee;
+            // Apply bonus points discount if requested (1 point = ₹1, capped at total before fee)
+            var pointsDiscount = 0m;
+            if (request.UsePoints)
+            {
+                var pointsRecords = await _bonusPointRepository.FindAsync(
+                    bp => bp.UserId == userId.Value, cancellationToken);
+                var availablePoints = pointsRecords.Sum(bp => bp.Points);
+                if (availablePoints > 0)
+                {
+                    // Cap discount at baseAmount (cannot pay platform fee or go negative)
+                    pointsDiscount = Math.Min(availablePoints, baseAmount);
+                    pointsDiscount = Math.Floor(pointsDiscount); // whole rupees only
+                }
+            }
+
+            var totalAmount = baseAmount + platformFee - pointsDiscount;
 
             // Create booking as pending until tutor approves
             var booking = new SessionBooking
@@ -187,6 +202,7 @@ public class BookSessionCommandHandler : IRequestHandler<BookSessionCommand, Res
                 HoursBooked = hoursBooked,
                 BaseAmount = baseAmount,
                 PlatformFee = platformFee,
+                PointsDiscount = pointsDiscount,
                 TotalAmount = totalAmount,
                 AttendanceMarked = false,
                 SpecialInstructions = request.SpecialInstructions,
@@ -196,7 +212,7 @@ public class BookSessionCommandHandler : IRequestHandler<BookSessionCommand, Res
 
             await _bookingRepository.AddAsync(booking, cancellationToken);
 
-            // Free session — skip Razorpay entirely and confirm immediately
+            // Free session (or fully covered by points) — skip Razorpay entirely and confirm immediately
             if (totalAmount == 0)
             {
                 booking.BookingStatus = BookingStatus.Confirmed;
@@ -206,17 +222,34 @@ public class BookSessionCommandHandler : IRequestHandler<BookSessionCommand, Res
                     StudentId = userId.Value,
                     TutorId = session.TutorId,
                     SessionId = session.Id,
-                    BaseAmount = 0,
-                    PlatformFee = 0,
+                    BaseAmount = baseAmount,
+                    PlatformFee = platformFee,
                     TotalAmount = 0,
                     Status = PaymentStatus.Success,
-                    PaymentGateway = "Free",
+                    PaymentGateway = pointsDiscount > 0 ? "BonusPoints" : "Free",
                     GatewayOrderId = $"free_{booking.Id}",
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
                 };
                 await _paymentRepository.AddAsync(freePayment, cancellationToken);
                 booking.PaymentId = freePayment.Id;
+
+                // Record points redemption
+                if (pointsDiscount > 0)
+                {
+                    var redemption = new BonusPoint
+                    {
+                        Id = Guid.NewGuid(),
+                        UserId = userId.Value,
+                        Points = -(int)pointsDiscount,
+                        Reason = BonusPointReason.Redemption,
+                        ReferenceId = booking.Id,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+                    await _bonusPointRepository.AddAsync(redemption, cancellationToken);
+                }
+
                 await _unitOfWork.CommitTransactionAsync(cancellationToken);
 
                 return Result<BookingDto>.SuccessResult(new BookingDto
@@ -225,8 +258,9 @@ public class BookSessionCommandHandler : IRequestHandler<BookSessionCommand, Res
                     SessionId = booking.SessionId,
                     Status = booking.BookingStatus,
                     HoursBooked = booking.HoursBooked,
-                    BaseAmount = 0,
-                    PlatformFee = 0,
+                    BaseAmount = baseAmount,
+                    PlatformFee = platformFee,
+                    PointsDiscount = pointsDiscount,
                     TotalAmount = 0,
                     RazorpayOrderId = null,
                     RazorpayKey = null,
@@ -262,7 +296,23 @@ public class BookSessionCommandHandler : IRequestHandler<BookSessionCommand, Res
 
             await _paymentRepository.AddAsync(payment, cancellationToken);
             booking.PaymentId = payment.Id;
-            
+
+            // Record points redemption for paid bookings that used points
+            if (pointsDiscount > 0)
+            {
+                var redemption = new BonusPoint
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = userId.Value,
+                    Points = -(int)pointsDiscount,
+                    Reason = BonusPointReason.Redemption,
+                    ReferenceId = booking.Id,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+                await _bonusPointRepository.AddAsync(redemption, cancellationToken);
+            }
+
             // Update session students count
             session.CurrentStudents++;
 
@@ -349,6 +399,7 @@ public class BookSessionCommandHandler : IRequestHandler<BookSessionCommand, Res
                 HoursBooked = booking.HoursBooked,
                 BaseAmount = booking.BaseAmount,
                 PlatformFee = booking.PlatformFee,
+                PointsDiscount = booking.PointsDiscount,
                 TotalAmount = booking.TotalAmount,
                 RazorpayOrderId = orderId,
                 RazorpayKey = key,
@@ -373,24 +424,33 @@ public class CancelBookingCommandHandler : IRequestHandler<CancelBookingCommand,
 {
     private readonly IRepository<Session> _sessionRepository;
     private readonly IRepository<SessionBooking> _bookingRepository;
+    private readonly IRepository<Payment> _paymentRepository;
+    private readonly IRepository<TutorEarning> _tutorEarningRepository;
     private readonly ICurrentUserService _currentUserService;
     private readonly INotificationService _notificationHelper;
     private readonly IRepository<User> _userRepository;
+    private readonly IPaymentService _paymentService;
     private readonly IUnitOfWork _unitOfWork;
 
     public CancelBookingCommandHandler(
         IRepository<Session> sessionRepository,
         IRepository<SessionBooking> bookingRepository,
+        IRepository<Payment> paymentRepository,
+        IRepository<TutorEarning> tutorEarningRepository,
         IRepository<User> userRepository,
         ICurrentUserService currentUserService,
         INotificationService notificationService,
+        IPaymentService paymentService,
         IUnitOfWork unitOfWork)
     {
         _sessionRepository = sessionRepository;
         _bookingRepository = bookingRepository;
+        _paymentRepository = paymentRepository;
+        _tutorEarningRepository = tutorEarningRepository;
         _userRepository = userRepository;
         _currentUserService = currentUserService;
         _notificationHelper = notificationService;
+        _paymentService = paymentService;
         _unitOfWork = unitOfWork;
     }
 
@@ -426,13 +486,51 @@ public class CancelBookingCommandHandler : IRequestHandler<CancelBookingCommand,
                 return Result.FailureResult("NOT_FOUND", "Session not found");
             }
 
+            // If booking was confirmed (already paid), initiate a refund
+            if (booking.BookingStatus == BookingStatus.Confirmed && booking.PaymentId.HasValue)
+            {
+                var payment = await _paymentRepository.GetByIdAsync(booking.PaymentId.Value, cancellationToken);
+                if (payment != null && payment.Status == PaymentStatus.Success && payment.TotalAmount > 0
+                    && !string.IsNullOrWhiteSpace(payment.GatewayPaymentId))
+                {
+                    try
+                    {
+                        await _paymentService.InitiateRefundAsync(payment.GatewayPaymentId, payment.TotalAmount);
+                        payment.Status = PaymentStatus.Refunded;
+                        payment.UpdatedAt = DateTime.UtcNow;
+                        await _paymentRepository.UpdateAsync(payment, cancellationToken);
+
+                        booking.RefundAmount = payment.TotalAmount;
+                        booking.RefundProcessedAt = DateTime.UtcNow;
+                    }
+                    catch
+                    {
+                        // Refund call failed — still cancel the booking but mark refund amount for manual processing
+                        booking.RefundAmount = payment.TotalAmount;
+                    }
+                }
+
+                // Cancel any pending earnings for this booking
+                var earnings = await _tutorEarningRepository.FindAsync(
+                    e => e.SourceId == session.Id && e.Status == EarningStatus.Pending,
+                    cancellationToken);
+                foreach (var earning in earnings)
+                {
+                    earning.Status = EarningStatus.Cancelled;
+                    earning.UpdatedAt = DateTime.UtcNow;
+                    await _tutorEarningRepository.UpdateAsync(earning, cancellationToken);
+                }
+            }
+
             // Update booking
             booking.BookingStatus = BookingStatus.Cancelled;
+            booking.CancellationReason = request.Reason;
             booking.UpdatedAt = DateTime.UtcNow;
             await _bookingRepository.UpdateAsync(booking, cancellationToken);
 
             // Update session
-            session.CurrentStudents--;
+            if (session.CurrentStudents > 0)
+                session.CurrentStudents--;
             await _sessionRepository.UpdateAsync(session, cancellationToken);
 
             // Notify tutor
@@ -516,6 +614,11 @@ public class RespondBookingCommandHandler : IRequestHandler<RespondBookingComman
         if (booking == null || booking.SessionId != session.Id)
         {
             return Result<BookingDto>.FailureResult("NOT_FOUND", "Booking not found");
+        }
+
+        if (booking.BookingStatus == BookingStatus.Confirmed)
+        {
+            return Result<BookingDto>.FailureResult("ALREADY_CONFIRMED", "This booking has already been paid and confirmed. Use the cancellation flow to refund.");
         }
 
         if (booking.BookingStatus != BookingStatus.Pending)

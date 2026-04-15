@@ -250,6 +250,8 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, Result<Re
             // Award 50 points immediately when referred user registers
             const decimal referralBonus = 50m;
 
+            const decimal joiningBonus = 25m;
+
             var referralProgram = new ReferralProgram
             {
                 Id = Guid.NewGuid(),
@@ -258,7 +260,7 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, Result<Re
                 ReferralCode = normalizedCode,
                 Status = "Completed",
                 RewardCredits = referralBonus,
-                JoiningBonusAmount = 0,
+                JoiningBonusAmount = joiningBonus,
                 ReferralBonusPaidAt = DateTime.UtcNow,
                 RewardedAt = DateTime.UtcNow,
                 CreatedAt = DateTime.UtcNow,
@@ -279,6 +281,19 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, Result<Re
                 UpdatedAt = DateTime.UtcNow
             };
             await _bonusPointRepository.AddAsync(bonusPoint, cancellationToken);
+
+            // Credit 25 joining bonus points to the newly referred student
+            var joiningBonusPoint = new BonusPoint
+            {
+                Id = Guid.NewGuid(),
+                UserId = newUserId,
+                Points = (int)joiningBonus,
+                Reason = BonusPointReason.Referral,
+                ReferenceId = referrerId,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            await _bonusPointRepository.AddAsync(joiningBonusPoint, cancellationToken);
 
             // Notify the referrer
             try

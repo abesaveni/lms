@@ -73,6 +73,9 @@ public class TutorProfile : BaseEntity
     /// <summary>Default trial price (0 = free)</summary>
     public decimal TrialPrice { get; set; } = 0;
 
+    /// <summary>Whether a verification-nudge reminder has already been sent to this tutor.</summary>
+    public bool VerificationReminderSent { get; set; } = false;
+
     // ── Auto-Payout ───────────────────────────────────────────────────────────
     public AutoPayoutSchedule AutoPayoutSchedule { get; set; } = AutoPayoutSchedule.Disabled;
 

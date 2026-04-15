@@ -103,6 +103,11 @@ public class SystemSettingsService : ISystemSettingsService
     {
         return await GetSettingAsync<decimal>("PlatformFeePercentage", 0.0m);
     }
+
+    public async Task<decimal> GetMaxPayoutPercentageAsync()
+    {
+        return await GetSettingAsync<decimal>("MaxPayoutPercentage", 90.0m);
+    }
 }
 
 

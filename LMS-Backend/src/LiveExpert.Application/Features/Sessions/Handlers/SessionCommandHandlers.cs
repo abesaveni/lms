@@ -461,6 +461,23 @@ public class CompleteSessionCommandHandler : IRequestHandler<CompleteSessionComm
                 booking.BookingStatus = BookingStatus.Completed;
                 await _bookingRepository.UpdateAsync(booking, cancellationToken);
 
+                // For group sessions: cancel earnings for students who were marked as absent
+                if (session.SessionType == SessionType.Group
+                    && booking.AttendanceMarked
+                    && !booking.Attended)
+                {
+                    var absentEarning = await _tutorEarningRepository.FirstOrDefaultAsync(
+                        e => e.BookingId == booking.Id && e.Status == EarningStatus.Pending,
+                        cancellationToken);
+                    if (absentEarning != null)
+                    {
+                        absentEarning.Status = EarningStatus.Cancelled;
+                        absentEarning.UpdatedAt = DateTime.UtcNow;
+                        await _tutorEarningRepository.UpdateAsync(absentEarning, cancellationToken);
+                    }
+                    continue; // Skip notification for absent students
+                }
+
                 // Notify student
                 var student = await _userRepository.GetByIdAsync(booking.StudentId, cancellationToken);
                 if (student != null)
@@ -475,18 +492,8 @@ public class CompleteSessionCommandHandler : IRequestHandler<CompleteSessionComm
                 }
             }
 
-            // Make tutor earnings available
-            var earnings = await _tutorEarningRepository.FindAsync(
-                e => e.SourceId == request.SessionId && e.Status == EarningStatus.Pending,
-                cancellationToken);
-
-            foreach (var earning in earnings)
-            {
-                earning.Status = EarningStatus.Available;
-                earning.AvailableAt = DateTime.UtcNow;
-                earning.UpdatedAt = DateTime.UtcNow;
-                await _tutorEarningRepository.UpdateAsync(earning, cancellationToken);
-            }
+            // Earnings remain Pending — EarningsReleaseService releases them after the 3-day hold
+            // set at payment verification time. Do NOT override AvailableAt here.
 
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
 

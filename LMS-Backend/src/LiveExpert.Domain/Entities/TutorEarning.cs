@@ -19,6 +19,11 @@ public class TutorEarning : BaseEntity
     /// ID of the session or course
     /// </summary>
     public Guid SourceId { get; set; }
+
+    /// <summary>
+    /// Booking that triggered this earning (null for course enrollments)
+    /// </summary>
+    public Guid? BookingId { get; set; }
     
     /// <summary>
     /// Earnings amount (in currency)
