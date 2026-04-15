@@ -172,6 +172,193 @@ public static class DbInitializer
                     createTableCmd.ExecuteNonQuery();
                     System.Diagnostics.Debug.WriteLine("✓ Repaired database: Created SessionMeetLinks table.");
                 }
+
+                // ── Flash Sale + Instant Booking + No-Show + RequiresSubscription on Sessions ──
+                checkCmd.CommandText = "PRAGMA table_info(Sessions)";
+                bool flashSalePriceExists = false, flashSaleEndsAtExists = false;
+                bool instantBookingExists = false, noShowProtectionExists = false, requiresSubscriptionExists = false;
+                using (var sessReader = checkCmd.ExecuteReader())
+                {
+                    while (sessReader.Read())
+                    {
+                        var col = sessReader["name"].ToString();
+                        if (col == "FlashSalePrice") flashSalePriceExists = true;
+                        if (col == "FlashSaleEndsAt") flashSaleEndsAtExists = true;
+                        if (col == "InstantBooking") instantBookingExists = true;
+                        if (col == "NoShowProtection") noShowProtectionExists = true;
+                        if (col == "RequiresSubscription") requiresSubscriptionExists = true;
+                    }
+                }
+                if (!flashSalePriceExists) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE Sessions ADD COLUMN FlashSalePrice TEXT NULL"; c2.ExecuteNonQuery(); }
+                if (!flashSaleEndsAtExists) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE Sessions ADD COLUMN FlashSaleEndsAt TEXT NULL"; c2.ExecuteNonQuery(); }
+                if (!instantBookingExists) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE Sessions ADD COLUMN InstantBooking INTEGER NOT NULL DEFAULT 0"; c2.ExecuteNonQuery(); }
+                if (!noShowProtectionExists) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE Sessions ADD COLUMN NoShowProtection INTEGER NOT NULL DEFAULT 0"; c2.ExecuteNonQuery(); }
+                if (!requiresSubscriptionExists) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE Sessions ADD COLUMN RequiresSubscription INTEGER NOT NULL DEFAULT 0"; c2.ExecuteNonQuery(); }
+
+                // ── HasBackgroundCheck + BackgroundCheckDate on TutorProfiles ──────────
+                checkCmd.CommandText = "PRAGMA table_info(TutorProfiles)";
+                bool hasBgCheck = false, bgCheckDate = false;
+                using (var tpReader = checkCmd.ExecuteReader())
+                {
+                    while (tpReader.Read())
+                    {
+                        var col = tpReader["name"].ToString();
+                        if (col == "HasBackgroundCheck") hasBgCheck = true;
+                        if (col == "BackgroundCheckDate") bgCheckDate = true;
+                    }
+                }
+                if (!hasBgCheck) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorProfiles ADD COLUMN HasBackgroundCheck INTEGER NOT NULL DEFAULT 0"; c2.ExecuteNonQuery(); }
+                if (!bgCheckDate) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorProfiles ADD COLUMN BackgroundCheckDate TEXT NULL"; c2.ExecuteNonQuery(); }
+
+                // ── CouponDiscount on SessionBookings ─────────────────────────────────
+                checkCmd.CommandText = "PRAGMA table_info(SessionBookings)";
+                bool couponDiscountExists = false;
+                using (var sbReader = checkCmd.ExecuteReader())
+                {
+                    while (sbReader.Read())
+                    {
+                        if (sbReader["name"].ToString() == "CouponDiscount") { couponDiscountExists = true; break; }
+                    }
+                }
+                if (!couponDiscountExists) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE SessionBookings ADD COLUMN CouponDiscount TEXT NOT NULL DEFAULT '0'"; c2.ExecuteNonQuery(); }
+
+                // ── Create CouponCodes table if missing ───────────────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='CouponCodes'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS CouponCodes (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            Code TEXT NOT NULL,
+                            Description TEXT NULL,
+                            DiscountType INTEGER NOT NULL DEFAULT 0,
+                            DiscountValue TEXT NOT NULL DEFAULT '0',
+                            MaxDiscountAmount TEXT NULL,
+                            MinOrderAmount TEXT NULL,
+                            MaxUses INTEGER NULL,
+                            UsedCount INTEGER NOT NULL DEFAULT 0,
+                            ExpiresAt TEXT NULL,
+                            IsActive INTEGER NOT NULL DEFAULT 1,
+                            TutorId TEXT NULL,
+                            CreatedByAdminId TEXT NULL,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── Create CouponUsages table if missing ──────────────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='CouponUsages'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS CouponUsages (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            CouponId TEXT NOT NULL,
+                            StudentId TEXT NOT NULL,
+                            BookingId TEXT NOT NULL,
+                            DiscountApplied TEXT NOT NULL DEFAULT '0',
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL,
+                            FOREIGN KEY (CouponId) REFERENCES CouponCodes(Id) ON DELETE CASCADE
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── StudentProfiles: ReferralCode, ReferredBy, ResumeData cols ──────
+                checkCmd.CommandText = "PRAGMA table_info(StudentProfiles)";
+                bool spReferralCode = false, spReferredBy = false, spResumeData = false, spResumeType = false, spResumeUpdated = false;
+                using (var spReader = checkCmd.ExecuteReader())
+                {
+                    while (spReader.Read())
+                    {
+                        var col = spReader["name"].ToString();
+                        if (col == "ReferralCode") spReferralCode = true;
+                        if (col == "ReferredBy") spReferredBy = true;
+                        if (col == "ResumeData") spResumeData = true;
+                        if (col == "ResumeType") spResumeType = true;
+                        if (col == "ResumeLastUpdatedAt") spResumeUpdated = true;
+                    }
+                }
+                if (!spReferralCode) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE StudentProfiles ADD COLUMN ReferralCode TEXT NOT NULL DEFAULT ''"; c2.ExecuteNonQuery(); }
+                if (!spReferredBy) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE StudentProfiles ADD COLUMN ReferredBy TEXT NULL"; c2.ExecuteNonQuery(); }
+                if (!spResumeData) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE StudentProfiles ADD COLUMN ResumeData TEXT NULL"; c2.ExecuteNonQuery(); }
+                if (!spResumeType) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE StudentProfiles ADD COLUMN ResumeType TEXT NULL"; c2.ExecuteNonQuery(); }
+                if (!spResumeUpdated) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE StudentProfiles ADD COLUMN ResumeLastUpdatedAt TEXT NULL"; c2.ExecuteNonQuery(); }
+
+                // ── ReferralPrograms: ExpiresAt + IsTutorReferral ─────────────────
+                checkCmd.CommandText = "PRAGMA table_info(ReferralPrograms)";
+                bool rpExpires = false, rpIsTutor = false;
+                using (var rpReader = checkCmd.ExecuteReader())
+                {
+                    while (rpReader.Read())
+                    {
+                        var col = rpReader["name"].ToString();
+                        if (col == "ExpiresAt") rpExpires = true;
+                        if (col == "IsTutorReferral") rpIsTutor = true;
+                    }
+                }
+                if (!rpExpires) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE ReferralPrograms ADD COLUMN ExpiresAt TEXT NULL"; c2.ExecuteNonQuery(); }
+                if (!rpIsTutor) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE ReferralPrograms ADD COLUMN IsTutorReferral INTEGER NOT NULL DEFAULT 0"; c2.ExecuteNonQuery(); }
+
+                // ── TutorProfiles: TutorReferralCode, AutoPayoutSchedule, AutoPayoutMinimumAmount ──
+                checkCmd.CommandText = "PRAGMA table_info(TutorProfiles)";
+                bool tpTutorRefCode = false, tpAutoPayout = false, tpAutoPayoutMin = false;
+                using (var tpReader2 = checkCmd.ExecuteReader())
+                {
+                    while (tpReader2.Read())
+                    {
+                        var col = tpReader2["name"].ToString();
+                        if (col == "TutorReferralCode") tpTutorRefCode = true;
+                        if (col == "AutoPayoutSchedule") tpAutoPayout = true;
+                        if (col == "AutoPayoutMinimumAmount") tpAutoPayoutMin = true;
+                    }
+                }
+                if (!tpTutorRefCode) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorProfiles ADD COLUMN TutorReferralCode TEXT NULL"; c2.ExecuteNonQuery(); }
+                if (!tpAutoPayout) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorProfiles ADD COLUMN AutoPayoutSchedule INTEGER NOT NULL DEFAULT 0"; c2.ExecuteNonQuery(); }
+                if (!tpAutoPayoutMin) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorProfiles ADD COLUMN AutoPayoutMinimumAmount TEXT NOT NULL DEFAULT '1000'"; c2.ExecuteNonQuery(); }
+
+                // ── StudentSubscriptions: new feature cols ────────────────────────
+                checkCmd.CommandText = "PRAGMA table_info(StudentSubscriptions)";
+                bool ssSessionsUsed = false, ssAutoRenew = false, ssRenewal = false, ssCancelReason = false;
+                bool ssRetDisc = false, ssRetPct = false, ssRetExp = false, ssPending = false;
+                using (var ssReader = checkCmd.ExecuteReader())
+                {
+                    while (ssReader.Read())
+                    {
+                        var col = ssReader["name"].ToString();
+                        if (col == "SessionsUsed") ssSessionsUsed = true;
+                        if (col == "AutoRenew") ssAutoRenew = true;
+                        if (col == "RenewalReminderSentAt") ssRenewal = true;
+                        if (col == "CancellationReason") ssCancelReason = true;
+                        if (col == "RetentionDiscountOffered") ssRetDisc = true;
+                        if (col == "RetentionDiscountPercent") ssRetPct = true;
+                        if (col == "RetentionOfferExpiry") ssRetExp = true;
+                        if (col == "PendingCancellation") ssPending = true;
+                    }
+                }
+                if (!ssSessionsUsed) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE StudentSubscriptions ADD COLUMN SessionsUsed INTEGER NOT NULL DEFAULT 0"; c2.ExecuteNonQuery(); }
+                if (!ssAutoRenew) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE StudentSubscriptions ADD COLUMN AutoRenew INTEGER NOT NULL DEFAULT 0"; c2.ExecuteNonQuery(); }
+                if (!ssRenewal) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE StudentSubscriptions ADD COLUMN RenewalReminderSentAt TEXT NULL"; c2.ExecuteNonQuery(); }
+                if (!ssCancelReason) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE StudentSubscriptions ADD COLUMN CancellationReason TEXT NULL"; c2.ExecuteNonQuery(); }
+                if (!ssRetDisc) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE StudentSubscriptions ADD COLUMN RetentionDiscountOffered INTEGER NOT NULL DEFAULT 0"; c2.ExecuteNonQuery(); }
+                if (!ssRetPct) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE StudentSubscriptions ADD COLUMN RetentionDiscountPercent TEXT NOT NULL DEFAULT '0'"; c2.ExecuteNonQuery(); }
+                if (!ssRetExp) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE StudentSubscriptions ADD COLUMN RetentionOfferExpiry TEXT NULL"; c2.ExecuteNonQuery(); }
+                if (!ssPending) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE StudentSubscriptions ADD COLUMN PendingCancellation INTEGER NOT NULL DEFAULT 0"; c2.ExecuteNonQuery(); }
+
+                // ── SubscriptionPlans: SessionsLimit ──────────────────────────────
+                checkCmd.CommandText = "PRAGMA table_info(SubscriptionPlans)";
+                bool spSessionsLimit = false;
+                using (var splReader = checkCmd.ExecuteReader())
+                {
+                    while (splReader.Read())
+                    {
+                        if (splReader["name"].ToString() == "SessionsLimit") { spSessionsLimit = true; break; }
+                    }
+                }
+                if (!spSessionsLimit) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE SubscriptionPlans ADD COLUMN SessionsLimit INTEGER NOT NULL DEFAULT 0"; c2.ExecuteNonQuery(); }
             }
         }
         catch (Exception ex)

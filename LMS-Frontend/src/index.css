@@ -3,9 +3,16 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    font-size: 14px;
+  }
   body {
     @apply bg-gray-50 text-gray-900 antialiased;
     font-family: 'Inter', system-ui, sans-serif;
+    line-height: 1.5;
+  }
+  * {
+    box-sizing: border-box;
   }
 }
 

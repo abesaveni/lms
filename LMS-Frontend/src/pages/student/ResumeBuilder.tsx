@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   FileText, Plus, Trash2, Download, Loader2,
-  Briefcase, GraduationCap, User, Star, AlertCircle,
+  Briefcase, GraduationCap, User, AlertCircle,
   Upload, CheckCircle, Sparkles
 } from 'lucide-react'
 import {
@@ -48,23 +48,63 @@ async function downloadResumePdf(candidateName: string) {
 }
 
 // ---------------------------------------------------------------------------
-// ATS Score Badge
+// ATS Score Badge + Suggestions
 // ---------------------------------------------------------------------------
-function AtsScoreBadge({ resumeText }: { resumeText: string }) {
-  // Heuristic local score based on keyword density
-  const keywords = ['experience', 'project', 'skill', 'developed', 'led', 'managed', 'achieved', 'improved', 'built', 'designed']
-  const lower = resumeText.toLowerCase()
-  const hits = keywords.filter(k => lower.includes(k)).length
-  const score = Math.min(95, 55 + hits * 4)
+const ATS_KEYWORDS = ['experience', 'project', 'skill', 'developed', 'led', 'managed', 'achieved', 'improved', 'built', 'designed']
+const ATS_SECTIONS = ['summary', 'objective', 'education', 'skills', 'experience', 'projects', 'certifications', 'contact']
+const ATS_SUGGESTIONS: Record<string, string> = {
+  experience: 'Add action verbs like "Developed", "Led", "Managed", or "Achieved" to describe impact.',
+  project: 'Include at least 2–3 project descriptions with tech stack and outcomes.',
+  skill: 'Add a dedicated Skills section listing relevant tools, languages, and frameworks.',
+  developed: 'Use past-tense action verbs (Built, Developed, Deployed) to quantify achievements.',
+  led: 'Highlight leadership experience with team size and outcomes.',
+  managed: 'Describe what you managed (team, budget, timeline) and the result.',
+  achieved: 'Quantify achievements — e.g., "Improved load time by 40%".',
+  improved: 'Back up improvements with metrics or percentages.',
+  built: 'Mention the technologies and scale of what you built.',
+  designed: 'Describe the design context — problem solved, tools used, impact.',
+  summary: 'Add a 2–3 sentence professional summary at the top.',
+  certifications: 'List relevant certifications (AWS, Google, etc.) to boost ATS scores.',
+  contact: 'Include LinkedIn URL, GitHub, and a professional email address.',
+}
 
-  const color = score >= 80 ? 'text-green-700 bg-green-100 border-green-200'
-    : score >= 65 ? 'text-yellow-700 bg-yellow-100 border-yellow-200'
-    : 'text-red-700 bg-red-100 border-red-200'
+function getAtsAnalysis(resumeText: string) {
+  const lower = resumeText.toLowerCase()
+  const hits = ATS_KEYWORDS.filter(k => lower.includes(k))
+  const score = Math.min(98, 50 + hits.length * 5)
+  const missing = [...ATS_KEYWORDS, ...ATS_SECTIONS].filter(k => !lower.includes(k))
+  const suggestions = missing.slice(0, 4).map(k => ATS_SUGGESTIONS[k]).filter(Boolean)
+  return { score, suggestions }
+}
+
+function AtsScoreBadge({ resumeText }: { resumeText: string }) {
+  const { score, suggestions } = getAtsAnalysis(resumeText)
+  const isAtsFriendly = score >= 80
 
   return (
-    <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-sm font-bold ${color}`}>
-      <Star className="w-4 h-4" />
-      ATS Score: {score}/100
+    <div className="space-y-2">
+      {isAtsFriendly ? (
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-sm font-bold text-green-700 bg-green-50 border-green-200">
+          <CheckCircle className="w-4 h-4" />
+          ATS Friendly — Score {score}/100
+        </div>
+      ) : (
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-sm font-bold text-yellow-700 bg-yellow-50 border-yellow-200">
+          <AlertCircle className="w-4 h-4" />
+          ATS Score: {score}/100 — Needs Improvement
+        </div>
+      )}
+      {!isAtsFriendly && suggestions.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-1.5">
+          <p className="text-xs font-bold text-amber-800 flex items-center gap-1">
+            <Sparkles className="w-3.5 h-3.5" />
+            Suggestions to reach 100/100
+          </p>
+          {suggestions.map((s, i) => (
+            <p key={i} className="text-xs text-amber-700 pl-4 before:content-['•'] before:-ml-3 before:mr-1">{s}</p>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
