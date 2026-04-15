@@ -8,8 +8,6 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import Button from '../../components/ui/Button'
 import { Avatar } from '../../components/ui/Avatar'
 import { isAdmin, getCurrentUser } from '../../utils/auth'
-import CalendarBlockingScreen from '../../components/calendar/CalendarBlockingScreen'
-
 import { getTutorProfile, TutorProfileDto, getEarningsOverview, getTutorDashboardStats } from '../../services/tutorApi'
 import { getTutorSessions, SessionDto } from '../../services/sessionsApi'
 
