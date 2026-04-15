@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { CouponDto, CreateCouponDto, createCoupon, toggleCoupon } from '../../services/couponsApi'
 import { apiGet } from '../../services/api'
 import Button from '../../components/ui/Button'
-import Input from '../../components/ui/Input'
 import { Badge } from '../../components/ui/Badge'
 
 // Extend CouponDto for admin listing
