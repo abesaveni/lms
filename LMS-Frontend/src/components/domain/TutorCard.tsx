@@ -1,6 +1,5 @@
-import { Star, Users, Clock, CheckCircle2, BookOpen, Zap } from 'lucide-react'
+import { Users, Clock, CheckCircle2, BookOpen, Zap } from 'lucide-react'
 import Button from '../ui/Button'
-import { Badge } from '../ui/Badge'
 
 interface TutorCardProps {
   name: string
