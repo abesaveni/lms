@@ -207,13 +207,24 @@ public class BookSessionCommandHandler : IRequestHandler<BookSessionCommand, Res
 
             var totalAmount = baseAmount + platformFee - pointsDiscount;
 
-            // Create booking as pending until tutor approves
+            // Feature: Apply flash sale price if active
+            if (session.FlashSalePrice.HasValue && session.FlashSaleEndsAt.HasValue && session.FlashSaleEndsAt.Value > DateTime.UtcNow)
+            {
+                baseAmount = session.PricingType == SessionPricingType.Hourly
+                    ? session.FlashSalePrice.Value * (hoursBooked ?? 0)
+                    : session.FlashSalePrice.Value;
+            }
+
+            // Feature: Instant Booking — auto-confirm without tutor approval
+            var initialStatus = session.InstantBooking ? BookingStatus.Confirmed : BookingStatus.Pending;
+
+            // Create booking
             var booking = new SessionBooking
             {
                 Id = Guid.NewGuid(),
                 SessionId = session.Id,
                 StudentId = userId.Value,
-                BookingStatus = BookingStatus.Pending,
+                BookingStatus = initialStatus,
                 HoursBooked = hoursBooked,
                 BaseAmount = baseAmount,
                 PlatformFee = platformFee,

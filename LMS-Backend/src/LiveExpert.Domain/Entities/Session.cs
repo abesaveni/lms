@@ -42,6 +42,20 @@ public class Session : BaseEntity
     /// <summary>When true, only students with an active subscription can book this session.</summary>
     public bool RequiresSubscription { get; set; } = false;
 
+    // ── Feature: Flash Sale ───────────────────────────────────────────────────
+    /// <summary>Discounted price during flash sale window. Null = no flash sale.</summary>
+    public decimal? FlashSalePrice { get; set; }
+    /// <summary>When the flash sale ends. Session reverts to BasePrice after this.</summary>
+    public DateTime? FlashSaleEndsAt { get; set; }
+
+    // ── Feature: Instant Booking ─────────────────────────────────────────────
+    /// <summary>When true, booking is auto-confirmed without tutor approval.</summary>
+    public bool InstantBooking { get; set; } = false;
+
+    // ── Feature: No-Show Protection ──────────────────────────────────────────
+    /// <summary>When true, no-show students are auto-refunded and awarded 50 bonus points.</summary>
+    public bool NoShowProtection { get; set; } = false;
+
     // Navigation Properties
     public User Tutor { get; set; } = null!;
     public Subject Subject { get; set; } = null!;

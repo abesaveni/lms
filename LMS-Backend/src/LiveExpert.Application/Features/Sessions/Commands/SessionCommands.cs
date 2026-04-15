@@ -18,6 +18,10 @@ public class CreateSessionCommand : IRequest<Result<SessionDto>>
     public int MaxStudents { get; set; } = 1;
     /// <summary>Feature 22: When true, only subscribed students can book this session.</summary>
     public bool RequiresSubscription { get; set; } = false;
+    public bool InstantBooking { get; set; } = false;
+    public bool NoShowProtection { get; set; } = false;
+    public decimal? FlashSalePrice { get; set; }
+    public DateTime? FlashSaleEndsAt { get; set; }
 }
 
 // Update Session Command
@@ -31,6 +35,10 @@ public class UpdateSessionCommand : IRequest<Result<SessionDto>>
     public decimal BasePrice { get; set; }
     public SessionPricingType PricingType { get; set; } = SessionPricingType.Fixed;
     public bool RequiresSubscription { get; set; } = false;
+    public bool InstantBooking { get; set; } = false;
+    public bool NoShowProtection { get; set; } = false;
+    public decimal? FlashSalePrice { get; set; }
+    public DateTime? FlashSaleEndsAt { get; set; }
 }
 
 // Cancel Session Command
@@ -107,6 +115,12 @@ public class SessionDto
     public bool IsBooked { get; set; }
     public bool IsReviewed { get; set; }
     public bool RequiresSubscription { get; set; }
+    public bool InstantBooking { get; set; }
+    public bool NoShowProtection { get; set; }
+    public decimal? FlashSalePrice { get; set; }
+    public DateTime? FlashSaleEndsAt { get; set; }
+    /// <summary>Effective price (flash sale if active, else BasePrice)</summary>
+    public decimal EffectivePrice { get; set; }
     public DateTime CreatedAt { get; set; }
 }
 

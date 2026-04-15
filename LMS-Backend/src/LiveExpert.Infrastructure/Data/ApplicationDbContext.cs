@@ -130,6 +130,10 @@ public class ApplicationDbContext : DbContext
     public DbSet<LearningPathStep> LearningPathSteps { get; set; }
     public DbSet<LearningPathEnrollment> LearningPathEnrollments { get; set; }
 
+    // Feature: Coupon Codes
+    public DbSet<CouponCode> CouponCodes { get; set; }
+    public DbSet<CouponUsage> CouponUsages { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

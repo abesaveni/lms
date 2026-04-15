@@ -79,6 +79,11 @@ public class TutorProfile : BaseEntity
     /// <summary>Referral code tutors can share to refer other tutors. Reward: bonus on referred tutor's first month earnings.</summary>
     public string? TutorReferralCode { get; set; }
 
+    // ── Background Check Badge ───────────────────────────────────────────────
+    /// <summary>True when admin has verified the tutor's background check. Shown as a badge on their profile.</summary>
+    public bool HasBackgroundCheck { get; set; } = false;
+    public DateTime? BackgroundCheckDate { get; set; }
+
     // ── Auto-Payout ───────────────────────────────────────────────────────────
     public AutoPayoutSchedule AutoPayoutSchedule { get; set; } = AutoPayoutSchedule.Disabled;
 

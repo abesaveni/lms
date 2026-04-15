@@ -922,6 +922,103 @@ namespace LiveExpert.Infrastructure.Migrations
                     b.ToTable("DailyChallenges");
                 });
 
+            modelBuilder.Entity("LiveExpert.Domain.Entities.CouponCode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("DiscountType")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("DiscountValue")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("MaxDiscountAmount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("MinOrderAmount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("MaxUses")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("UsedCount")
+                        .HasDefaultValue(0)
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasDefaultValue(true)
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid?>("TutorId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("CreatedByAdminId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("CouponCodes");
+                });
+
+            modelBuilder.Entity("LiveExpert.Domain.Entities.CouponUsage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("CouponId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("StudentId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("BookingId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("DiscountApplied")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CouponId");
+
+                    b.ToTable("CouponUsages");
+                });
+
             modelBuilder.Entity("LiveExpert.Domain.Entities.Dispute", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1646,6 +1743,18 @@ namespace LiveExpert.Infrastructure.Migrations
                     b.Property<bool>("RequiresSubscription")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("InstantBooking")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("NoShowProtection")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal?>("FlashSalePrice")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("FlashSaleEndsAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("MaxStudents")
                         .HasColumnType("INTEGER");
 
@@ -2322,6 +2431,12 @@ namespace LiveExpert.Infrastructure.Migrations
 
                     b.Property<string>("TutorReferralCode")
                         .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("HasBackgroundCheck")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("BackgroundCheckDate")
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAt")

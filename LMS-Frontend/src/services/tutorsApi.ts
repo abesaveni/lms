@@ -28,6 +28,10 @@ export interface TutorDto {
   subjects?: string[]
   location?: string
   available?: boolean
+  hasBackgroundCheck?: boolean
+  trialAvailable?: boolean
+  trialDurationMinutes?: number
+  trialPrice?: number
 }
 
 export interface TutorListResponse {

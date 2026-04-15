@@ -149,6 +149,10 @@ public class CreateSessionCommandHandler : IRequestHandler<CreateSessionCommand,
             GoogleCalendarEventId = calendarEventId,
             IsRecorded = false,
             RequiresSubscription = request.RequiresSubscription,
+            InstantBooking = request.InstantBooking,
+            NoShowProtection = request.NoShowProtection,
+            FlashSalePrice = request.FlashSalePrice,
+            FlashSaleEndsAt = request.FlashSaleEndsAt,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -220,6 +224,12 @@ public class CreateSessionCommandHandler : IRequestHandler<CreateSessionCommand,
             MeetingLink = session.MeetingLink,
             IsBooked = false,
             RequiresSubscription = session.RequiresSubscription,
+            InstantBooking = session.InstantBooking,
+            NoShowProtection = session.NoShowProtection,
+            FlashSalePrice = session.FlashSalePrice,
+            FlashSaleEndsAt = session.FlashSaleEndsAt,
+            EffectivePrice = (session.FlashSalePrice.HasValue && session.FlashSaleEndsAt > DateTime.UtcNow)
+                ? session.FlashSalePrice.Value : session.BasePrice,
             CreatedAt = session.CreatedAt
         });
     }
@@ -274,6 +284,10 @@ public class UpdateSessionCommandHandler : IRequestHandler<UpdateSessionCommand,
         session.BasePrice = request.BasePrice;
         session.PricingType = request.PricingType;
         session.RequiresSubscription = request.RequiresSubscription;
+        session.InstantBooking = request.InstantBooking;
+        session.NoShowProtection = request.NoShowProtection;
+        session.FlashSalePrice = request.FlashSalePrice;
+        session.FlashSaleEndsAt = request.FlashSaleEndsAt;
         session.UpdatedAt = DateTime.UtcNow;
 
         await _sessionRepository.UpdateAsync(session, cancellationToken);
@@ -302,6 +316,12 @@ public class UpdateSessionCommandHandler : IRequestHandler<UpdateSessionCommand,
             MeetingLink = session.MeetingLink,
             IsBooked = false,
             RequiresSubscription = session.RequiresSubscription,
+            InstantBooking = session.InstantBooking,
+            NoShowProtection = session.NoShowProtection,
+            FlashSalePrice = session.FlashSalePrice,
+            FlashSaleEndsAt = session.FlashSaleEndsAt,
+            EffectivePrice = (session.FlashSalePrice.HasValue && session.FlashSaleEndsAt > DateTime.UtcNow)
+                ? session.FlashSalePrice.Value : session.BasePrice,
             CreatedAt = session.CreatedAt
         });
     }

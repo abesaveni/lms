@@ -360,8 +360,10 @@ public class TutorsController : ControllerBase
                         FollowerCount = await _followerRepository.CountAsync(f => f.TutorId == user.Id),
                         VerificationStatus = tutor.VerificationStatus.ToString(),
                         ProfileImage = user.ProfileImageUrl,
-                        Subjects = string.IsNullOrEmpty(tutor.Skills) 
-                            ? new string[] { } 
+                        HasBackgroundCheck = tutor.HasBackgroundCheck,
+                        TrialAvailable = tutor.TrialAvailable,
+                        Subjects = string.IsNullOrEmpty(tutor.Skills)
+                            ? new string[] { }
                             : tutor.Skills.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).ToArray()
                     });
                 }
@@ -414,8 +416,12 @@ public class TutorsController : ControllerBase
             ProfileImage = user?.ProfileImageUrl,
             FollowerCount = followerCount,
             Location = user?.Location,
-            Subjects = string.IsNullOrEmpty(tutor.Skills) 
-                ? new string[] { } 
+            HasBackgroundCheck = tutor.HasBackgroundCheck,
+            TrialAvailable = tutor.TrialAvailable,
+            TrialDurationMinutes = tutor.TrialDurationMinutes,
+            TrialPrice = tutor.TrialPrice,
+            Subjects = string.IsNullOrEmpty(tutor.Skills)
+                ? new string[] { }
                 : tutor.Skills.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).ToArray()
         }));
     }
