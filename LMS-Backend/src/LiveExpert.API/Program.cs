@@ -1,3 +1,4 @@
+using Hangfire;
 using LiveExpert.Infrastructure.Data;
 using LiveExpert.Infrastructure;
 using LiveExpert.API.Middleware;
@@ -272,6 +273,20 @@ app.UseAuditLogging(); // Audit logging
 
 app.UseSwagger();
 app.UseSwaggerUI();
+
+// Hangfire dashboard — protected by basic auth using credentials from appsettings/env
+var hangfirePath     = app.Configuration["Hangfire:DashboardPath"] ?? "/hangfire";
+var hangfireUser     = app.Configuration["Hangfire:Username"]      ?? "admin";
+var hangfirePassword = app.Configuration["Hangfire:Password"]      ?? "admin";
+app.UseHangfireDashboard(hangfirePath, new DashboardOptions
+{
+    Authorization = new[]
+    {
+        new LiveExpert.API.Middleware.HangfireBasicAuthFilter(hangfireUser, hangfirePassword)
+    },
+    IgnoreAntiforgeryToken = true
+});
+Console.WriteLine($"✓ Hangfire dashboard: {hangfirePath}");
 
 // Don't use HTTPS redirection in development as it can interfere with CORS
 if (!app.Environment.IsDevelopment())

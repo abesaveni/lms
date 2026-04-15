@@ -181,29 +181,22 @@ public class CreateSessionCommandHandler : IRequestHandler<CreateSessionCommand,
             var sessionTime = session.ScheduledAt.ToString("f");
             var emailBody = EmailTemplates.SessionScheduledEmail(tutorName, session.Title, sessionTime, "/tutor/sessions", "Various students", "Tutor");
 
-            try
+            await _notificationDispatcher.SendAsync(new NotificationDispatchRequest
             {
-                await _notificationDispatcher.SendAsync(new NotificationDispatchRequest
-                {
-                    UserId = tutor.Id,
-                    Category = NotificationCategory.SessionBooking,
-                    IsTransactional = true,
-                    Title = "Session Created",
-                    Message = $"Your session \"{session.Title}\" has been created.",
-                    ActionUrl = "/tutor/sessions",
-                    EmailTo = tutor.Email,
-                    EmailSubject = "Session Created Successfully",
-                    EmailBody = emailBody,
-                    EmailIsHtml = true,
-                    WhatsAppTo = tutor.WhatsAppNumber ?? tutor.PhoneNumber,
-                    WhatsAppMessage = $"✅ Session Created!\n\nHi {tutorName}, your session *{session.Title}* has been created and is now live.\n\nScheduled: {session.ScheduledAt:dd MMM yyyy, HH:mm}\n\nManage it at LiveExpert.ai/tutor/sessions",
-                    SendInApp = true
-                }, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to send session creation notification — SMTP not configured");
-            }
+                UserId = tutor.Id,
+                Category = NotificationCategory.SessionBooking,
+                IsTransactional = true,
+                Title = "Session Created",
+                Message = $"Your session \"{session.Title}\" has been created.",
+                ActionUrl = "/tutor/sessions",
+                EmailTo = tutor.Email,
+                EmailSubject = "Session Created Successfully",
+                EmailBody = emailBody,
+                EmailIsHtml = true,
+                WhatsAppTo = tutor.WhatsAppNumber ?? tutor.PhoneNumber,
+                WhatsAppMessage = $"✅ Session Created!\n\nHi {tutorName}, your session *{session.Title}* has been created and is now live.\n\nScheduled: {session.ScheduledAt:dd MMM yyyy, HH:mm}\n\nManage it at LiveExpert.ai/tutor/sessions",
+                SendInApp = true
+            }, cancellationToken);
         }
 
         return Result<SessionDto>.SuccessResult(new SessionDto

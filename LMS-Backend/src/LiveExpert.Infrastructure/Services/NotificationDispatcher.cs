@@ -1,3 +1,4 @@
+using Hangfire;
 using LiveExpert.Application.Interfaces;
 using LiveExpert.Domain.Enums;
 using Microsoft.Extensions.Logging;
@@ -8,26 +9,24 @@ public class NotificationDispatcher : INotificationDispatcher
 {
     private readonly INotificationPreferenceService _preferenceService;
     private readonly INotificationService _notificationService;
-    private readonly IEmailService _emailService;
-    private readonly IWhatsAppService _whatsAppService;
+    private readonly IBackgroundJobClient _backgroundJobClient;
     private readonly ILogger<NotificationDispatcher> _logger;
 
     public NotificationDispatcher(
         INotificationPreferenceService preferenceService,
         INotificationService notificationService,
-        IEmailService emailService,
-        IWhatsAppService whatsAppService,
+        IBackgroundJobClient backgroundJobClient,
         ILogger<NotificationDispatcher> logger)
     {
         _preferenceService = preferenceService;
         _notificationService = notificationService;
-        _emailService = emailService;
-        _whatsAppService = whatsAppService;
+        _backgroundJobClient = backgroundJobClient;
         _logger = logger;
     }
 
     public async Task SendAsync(NotificationDispatchRequest request, CancellationToken cancellationToken = default)
     {
+        // In-app: fast (DB write + SignalR push) — keep inline
         if (request.SendInApp)
         {
             var canSend = await _preferenceService.IsChannelEnabledAsync(
@@ -56,8 +55,11 @@ public class NotificationDispatcher : INotificationDispatcher
             }
         }
 
-        if (request.SendEmail && !string.IsNullOrWhiteSpace(request.EmailTo) &&
-            !string.IsNullOrWhiteSpace(request.EmailSubject) && !string.IsNullOrWhiteSpace(request.EmailBody))
+        // Email: slow + unreliable — enqueue as background job so the API responds immediately
+        if (request.SendEmail &&
+            !string.IsNullOrWhiteSpace(request.EmailTo) &&
+            !string.IsNullOrWhiteSpace(request.EmailSubject) &&
+            !string.IsNullOrWhiteSpace(request.EmailBody))
         {
             var canSend = await _preferenceService.IsChannelEnabledAsync(
                 request.UserId,
@@ -68,19 +70,17 @@ public class NotificationDispatcher : INotificationDispatcher
 
             if (canSend)
             {
-                try
-                {
-                    await _emailService.SendEmailAsync(request.EmailTo!, request.EmailSubject!, request.EmailBody!, request.EmailIsHtml);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Email notification failed to {EmailTo} — SMTP not configured", request.EmailTo);
-                }
+                _backgroundJobClient.Enqueue<NotificationDispatchJob>(
+                    job => job.SendEmailAsync(
+                        request.EmailTo!,
+                        request.EmailSubject!,
+                        request.EmailBody!,
+                        request.EmailIsHtml));
             }
         }
 
-        if (request.SendWhatsApp && !string.IsNullOrWhiteSpace(request.WhatsAppTo) &&
-            !string.IsNullOrWhiteSpace(request.WhatsAppMessage))
+        // WhatsApp: external API call — enqueue as background job
+        if (request.SendWhatsApp && !string.IsNullOrWhiteSpace(request.WhatsAppTo))
         {
             var canSend = await _preferenceService.IsChannelEnabledAsync(
                 request.UserId,
@@ -91,23 +91,20 @@ public class NotificationDispatcher : INotificationDispatcher
 
             if (canSend)
             {
-                try
+                if (!string.IsNullOrWhiteSpace(request.WhatsAppTemplateName))
                 {
-                    if (!string.IsNullOrWhiteSpace(request.WhatsAppTemplateName))
-                    {
-                        await _whatsAppService.SendTemplateMessageAsync(
+                    _backgroundJobClient.Enqueue<NotificationDispatchJob>(
+                        job => job.SendWhatsAppTemplateAsync(
                             request.WhatsAppTo!,
                             request.WhatsAppTemplateName!,
-                            request.WhatsAppParameters ?? new List<string>());
-                    }
-                    else if (!string.IsNullOrWhiteSpace(request.WhatsAppMessage))
-                    {
-                        await _whatsAppService.SendMessageAsync(request.WhatsAppTo!, request.WhatsAppMessage!);
-                    }
+                            request.WhatsAppParameters ?? new List<string>()));
                 }
-                catch (Exception ex)
+                else if (!string.IsNullOrWhiteSpace(request.WhatsAppMessage))
                 {
-                    _logger.LogWarning(ex, "WhatsApp notification failed to {WhatsAppTo}", request.WhatsAppTo);
+                    _backgroundJobClient.Enqueue<NotificationDispatchJob>(
+                        job => job.SendWhatsAppMessageAsync(
+                            request.WhatsAppTo!,
+                            request.WhatsAppMessage!));
                 }
             }
         }

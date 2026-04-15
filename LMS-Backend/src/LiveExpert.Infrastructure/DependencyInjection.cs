@@ -1,3 +1,5 @@
+using Hangfire;
+using Hangfire.MemoryStorage;
 using LiveExpert.Application.Interfaces;
 using LiveExpert.Infrastructure.Data;
 using LiveExpert.Infrastructure.Repositories;
@@ -57,6 +59,20 @@ public static class DependencyInjection
 
         // Background Services
         services.AddHostedService<SessionReminderBackgroundService>();
+
+        // Hangfire — background job queue for notifications (email, WhatsApp)
+        // MemoryStorage: jobs survive SMTP blips but are lost on process restart (acceptable for notifications)
+        services.AddHangfire(config => config
+            .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+            .UseSimpleAssemblyNameTypeSerializer()
+            .UseRecommendedSerializerSettings()
+            .UseMemoryStorage());
+        services.AddHangfireServer(options =>
+        {
+            options.WorkerCount = 2; // Low concurrency — notifications don't need many parallel workers
+            options.Queues = new[] { "default" };
+        });
+        services.AddScoped<NotificationDispatchJob>();
 
         return services;
     }
