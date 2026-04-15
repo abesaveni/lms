@@ -104,7 +104,7 @@ const AdminDashboard = () => {
                     transition={{ delay: 0.3 }}
                     className="text-5xl font-bold mb-2"
                   >
-                    ${dashboard?.totalRevenue?.toLocaleString() ?? '0'}
+                    ₹{dashboard?.totalRevenue?.toLocaleString('en-IN') ?? '0'}
                   </motion.div>
                   <div className="flex items-center gap-2 text-primary-100">
                     <TrendingUp className="w-4 h-4" />

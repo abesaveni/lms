@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Ca
 import Button from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
 import { Avatar } from '../../components/ui/Avatar'
-import { getSessionById, getSessionMeetingLink, startSession, SessionDto } from '../../services/sessionsApi'
+import { getSessionById, getSessionMeetingLink, startSession, joinSession, SessionDto } from '../../services/sessionsApi'
 import { getCurrentUserRole } from '../../utils/auth'
 
 const JoinSession = () => {
@@ -17,6 +17,7 @@ const JoinSession = () => {
   const [session, setSession] = useState<SessionDto | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [sessionError, setSessionError] = useState<string | null>(null)
 
   // Fetch session data
   const fetchSession = async () => {
@@ -64,43 +65,52 @@ const JoinSession = () => {
   };
 
   const handleGetLinkAndOpen = async () => {
+    setSessionError(null)
     try {
       if (!sessionId) return;
-      
-      if (session?.meetingLink) {
-        const workingLink = getWorkingLink(session.meetingLink);
-        window.open(workingLink, '_blank');
-        setMeetingStarted(true);
-        return;
+
+      let meetUrl: string | undefined
+
+      if (isTutor) {
+        // Tutor: use existing meetingLink on session DTO, or GET /meeting-link
+        if (session?.meetingLink) {
+          meetUrl = getWorkingLink(session.meetingLink)
+        } else {
+          const data = await getSessionMeetingLink(sessionId)
+          meetUrl = data.meetingLink || undefined
+        }
+      } else {
+        // Student: use POST /join which returns the decrypted Jitsi URL
+        const data = await joinSession(sessionId)
+        meetUrl = data.meetUrl || undefined
       }
-      
-      const data = await getSessionMeetingLink(sessionId);
-      if (data.meetingLink) {
-        const workingLink = getWorkingLink(data.meetingLink);
-        window.open(workingLink, '_blank');
+
+      if (meetUrl) {
+        window.open(meetUrl, '_blank');
         setMeetingStarted(true);
       } else {
-        alert('Meeting link could not be generated.');
+        setSessionError('Meeting link could not be retrieved. Please wait for the tutor to start the session.');
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to get meeting link.');
+      setSessionError(err.message || 'Failed to get meeting link.');
     }
   }
 
   const handleStartMeeting = async () => {
     if (!sessionId) return;
+    setSessionError(null)
     try {
       // 1. Call backend to start the session (updates status to Live)
       await startSession(sessionId);
-      
+
       // 2. Update local state
       setMeetingStarted(true);
       setWaitingForAdmission(false);
-      
+
       // 3. Open the link
       handleGetLinkAndOpen();
     } catch (err: any) {
-      alert(err.message || 'Failed to start meeting');
+      setSessionError(err.message || 'Failed to start meeting');
     }
   }
 
@@ -158,6 +168,12 @@ const JoinSession = () => {
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Session: {session.title}</h1>
         <p className="text-gray-600">Join your scheduled session</p>
       </div>
+
+      {sessionError && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+          {sessionError}
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Session Info */}
@@ -243,7 +259,7 @@ const JoinSession = () => {
         <div className="lg:col-span-2">
           <Card>
             <CardHeader>
-              <CardTitle>Google Meet Session</CardTitle>
+              <CardTitle>Video Session</CardTitle>
             </CardHeader>
             <CardContent>
               {!isTutor && new Date() < new Date(session.scheduledAt) ? (
@@ -280,14 +296,14 @@ const JoinSession = () => {
                     {/* Note: Google Meet has embedding restrictions, so we'll use a button to open in new tab */}
                     <div className="text-center text-white">
                       <Video className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                      <p className="text-lg mb-4">Google Meet Session</p>
+                      <p className="text-lg mb-4">Jitsi Video Session</p>
                       <Button
                         onClick={handleJoinEmbedded}
                         variant="secondary"
                         size="lg"
                       >
                         <Video className="mr-2 w-5 h-5" />
-                        Join Google Meet
+                        Join Video Meeting
                       </Button>
                       <p className="text-sm text-gray-400 mt-4">
                         Click to join the meeting in a new window
@@ -297,8 +313,8 @@ const JoinSession = () => {
                   
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                     <p className="text-sm text-blue-800">
-                      <strong>Note:</strong> Due to Google Meet's security policies, the meeting will open in a new tab. 
-                      The tutor controls who can join the session.
+                      <strong>Note:</strong> The video meeting will open in a new tab via Jitsi Meet.
+                      No account or app installation required.
                     </p>
                   </div>
                 </div>

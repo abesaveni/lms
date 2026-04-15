@@ -17,6 +17,7 @@ export interface TutorDto {
   bio?: string
   headline?: string
   hourlyRate: number
+  hourlyRateGroup?: number
   yearsOfExperience?: number
   averageRating?: number
   totalReviews?: number

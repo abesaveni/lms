@@ -82,6 +82,96 @@ public static class DbInitializer
                     alterCmd.ExecuteNonQuery();
                     System.Diagnostics.Debug.WriteLine("✓ Repaired database: Added Location column to Users table.");
                 }
+
+                // Check for HourlyRateGroup in TutorProfiles table
+                checkCmd.CommandText = "PRAGMA table_info(TutorProfiles)";
+                bool hourlyRateGroupExists = false;
+                using var tutorReader = checkCmd.ExecuteReader();
+                while (tutorReader.Read())
+                {
+                    if (tutorReader["name"].ToString() == "HourlyRateGroup") { hourlyRateGroupExists = true; break; }
+                }
+                tutorReader.Close();
+                if (!hourlyRateGroupExists)
+                {
+                    using var alterCmd = connection.CreateCommand();
+                    alterCmd.CommandText = "ALTER TABLE TutorProfiles ADD COLUMN HourlyRateGroup REAL NOT NULL DEFAULT 0";
+                    alterCmd.ExecuteNonQuery();
+                    System.Diagnostics.Debug.WriteLine("✓ Repaired database: Added HourlyRateGroup column to TutorProfiles table.");
+                }
+
+                // Check if TutorSubjectRates table exists
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='TutorSubjectRates'";
+                var subjectRatesTable = checkCmd.ExecuteScalar();
+                if (subjectRatesTable == null)
+                {
+                    using var createSubjectRatesCmd = connection.CreateCommand();
+                    createSubjectRatesCmd.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS TutorSubjectRates (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            TutorId TEXT NOT NULL,
+                            SubjectId TEXT NULL,
+                            SubjectName TEXT NOT NULL DEFAULT '',
+                            HourlyRate REAL NOT NULL DEFAULT 0,
+                            TrialRate REAL NULL,
+                            IsActive INTEGER NOT NULL DEFAULT 1,
+                            DisplayOrder INTEGER NOT NULL DEFAULT 0,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL,
+                            FOREIGN KEY (TutorId) REFERENCES Users(Id) ON DELETE CASCADE
+                        )";
+                    createSubjectRatesCmd.ExecuteNonQuery();
+                    System.Diagnostics.Debug.WriteLine("✓ Repaired database: Created TutorSubjectRates table.");
+                }
+
+                // Check if UserCalendarConnections table exists
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='UserCalendarConnections'";
+                var calConnTable = checkCmd.ExecuteScalar();
+                if (calConnTable == null)
+                {
+                    using var createCalConnCmd = connection.CreateCommand();
+                    createCalConnCmd.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS UserCalendarConnections (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            UserId TEXT NOT NULL,
+                            Provider INTEGER NOT NULL DEFAULT 0,
+                            AccessToken TEXT NOT NULL,
+                            RefreshToken TEXT NOT NULL,
+                            TokenExpiry TEXT NOT NULL,
+                            GoogleEmail TEXT NOT NULL DEFAULT '',
+                            IsActive INTEGER NOT NULL DEFAULT 1,
+                            LastRefreshedAt TEXT NULL,
+                            ConnectedAt TEXT NOT NULL,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL,
+                            FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE
+                        )";
+                    createCalConnCmd.ExecuteNonQuery();
+                    System.Diagnostics.Debug.WriteLine("✓ Repaired database: Created UserCalendarConnections table.");
+                }
+
+                // Check if SessionMeetLinks table exists (added after initial DB creation)
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='SessionMeetLinks'";
+                var tableResult = checkCmd.ExecuteScalar();
+                if (tableResult == null)
+                {
+                    using var createTableCmd = connection.CreateCommand();
+                    createTableCmd.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS SessionMeetLinks (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            SessionId TEXT NOT NULL UNIQUE,
+                            MeetUrl TEXT NOT NULL,
+                            CalendarEventId TEXT NULL,
+                            IsActive INTEGER NOT NULL DEFAULT 1,
+                            SessionStartedAt TEXT NULL,
+                            SessionEndedAt TEXT NULL,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL,
+                            FOREIGN KEY (SessionId) REFERENCES Sessions(Id) ON DELETE CASCADE
+                        )";
+                    createTableCmd.ExecuteNonQuery();
+                    System.Diagnostics.Debug.WriteLine("✓ Repaired database: Created SessionMeetLinks table.");
+                }
             }
         }
         catch (Exception ex)
@@ -127,21 +217,66 @@ public static class DbInitializer
             System.Diagnostics.Debug.WriteLine($"✓ Super Admin credentials reset: {SUPER_ADMIN_EMAIL} / {SUPER_ADMIN_PASSWORD}");
         }
 
-        // Seed default subjects if none exist
-        if (!context.Subjects.Any())
+        // Seed / self-heal subjects — adds any missing subjects even on existing databases
+        var allSubjectDefs = new List<(string Name, string Slug, string Description)>
         {
-            var defaultSubjects = new List<Subject>
+            // STEM
+            ("Mathematics", "mathematics", "Calculus, Algebra, Geometry, Statistics"),
+            ("Physics", "physics", "Classical Mechanics, Quantum Physics, Thermodynamics"),
+            ("Chemistry", "chemistry", "Organic, Inorganic, Physical Chemistry"),
+            ("Biology", "biology", "Cell Biology, Genetics, Ecology, Human Anatomy"),
+            ("Computer Science", "computer-science", "Algorithms, Data Structures, OOP, OS"),
+            ("Statistics", "statistics", "Probability, Hypothesis Testing, Data Analysis"),
+            // Languages & Literature
+            ("English Literature", "english-literature", "Modern & Classical Literature, Writing"),
+            ("English Language", "english-language", "Grammar, Writing, Reading Comprehension"),
+            ("Hindi", "hindi", "Hindi Language, Literature, Grammar"),
+            ("French", "french", "French Language, Grammar, Conversation"),
+            ("Spanish", "spanish", "Spanish Language, Grammar, Conversation"),
+            // Technology
+            ("Web Development", "web-development", "React, Node.js, HTML/CSS, JavaScript"),
+            ("Data Science", "data-science", "Python, Machine Learning, AI, Statistics"),
+            ("Mobile Development", "mobile-development", "iOS, Android, React Native, Flutter"),
+            ("Cybersecurity", "cybersecurity", "Network Security, Ethical Hacking, Cryptography"),
+            ("Cloud Computing", "cloud-computing", "AWS, Azure, GCP, DevOps"),
+            ("Database Management", "database-management", "SQL, NoSQL, MongoDB, PostgreSQL"),
+            // Commerce & Humanities
+            ("Business Studies", "business-studies", "Marketing, Finance, Management, Strategy"),
+            ("Economics", "economics", "Microeconomics, Macroeconomics, Business Economics"),
+            ("Accountancy", "accountancy", "Financial Accounting, Cost Accounting, Taxation"),
+            ("History", "history", "World History, Indian History, Political History"),
+            ("Geography", "geography", "Physical Geography, Human Geography, Map Work"),
+            ("Political Science", "political-science", "Political Theory, Governance, International Relations"),
+            ("Psychology", "psychology", "Cognitive, Developmental, Clinical Psychology"),
+            ("Sociology", "sociology", "Social Theory, Research Methods, Culture"),
+            // Test Prep & Other
+            ("JEE Preparation", "jee-preparation", "Physics, Chemistry, Maths for IIT-JEE"),
+            ("NEET Preparation", "neet-preparation", "Biology, Physics, Chemistry for NEET"),
+            ("CAT / MBA Prep", "cat-mba-prep", "Quantitative Aptitude, Verbal Ability, LRDI"),
+            ("UPSC / Civil Services", "upsc-civil-services", "GS, Optional Subjects, Essay, CSAT"),
+            ("Music", "music", "Classical, Western, Vocals, Instruments"),
+            ("Art & Drawing", "art-drawing", "Sketching, Painting, Digital Art"),
+        };
+
+        var existingSlugs = context.Subjects.Select(s => s.Slug).ToHashSet();
+        var newSubjects = allSubjectDefs
+            .Where(d => !existingSlugs.Contains(d.Slug))
+            .Select(d => new Subject
             {
-                new Subject { Id = Guid.NewGuid(), Name = "Web Development", Slug = "web-development", Description = "React, Node.js, HTML/CSS", IsActive = true, CreatedAt = DateTime.UtcNow },
-                new Subject { Id = Guid.NewGuid(), Name = "Data Science", Slug = "data-science", Description = "Python, ML, AI, Statistics", IsActive = true, CreatedAt = DateTime.UtcNow },
-                new Subject { Id = Guid.NewGuid(), Name = "Mathematics", Slug = "mathematics", Description = "Calculus, Algebra, Geometry", IsActive = true, CreatedAt = DateTime.UtcNow },
-                new Subject { Id = Guid.NewGuid(), Name = "Physics", Slug = "physics", Description = "Classical Mechanics, Quantum Physics", IsActive = true, CreatedAt = DateTime.UtcNow },
-                new Subject { Id = Guid.NewGuid(), Name = "English Literature", Slug = "english-literature", Description = "Modern & Classical Literature", IsActive = true, CreatedAt = DateTime.UtcNow },
-                new Subject { Id = Guid.NewGuid(), Name = "Business Studies", Slug = "business-studies", Description = "Marketing, Finance, Management", IsActive = true, CreatedAt = DateTime.UtcNow }
-            };
-            context.Subjects.AddRange(defaultSubjects);
+                Id = Guid.NewGuid(),
+                Name = d.Name,
+                Slug = d.Slug,
+                Description = d.Description,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            })
+            .ToList();
+
+        if (newSubjects.Any())
+        {
+            context.Subjects.AddRange(newSubjects);
             await context.SaveChangesAsync();
-            System.Diagnostics.Debug.WriteLine($"✓ Seeded {defaultSubjects.Count} default subjects.");
+            System.Diagnostics.Debug.WriteLine($"✓ Seeded {newSubjects.Count} subjects (total now: {existingSlugs.Count + newSubjects.Count}).");
         }
 
         await context.SaveChangesAsync();

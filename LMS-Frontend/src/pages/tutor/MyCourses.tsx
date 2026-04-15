@@ -17,6 +17,7 @@ const TutorMyCourses = () => {
   const [courses, setCourses] = useState<CourseListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [actionMenu, setActionMenu] = useState<string | null>(null)
 
   useEffect(() => {
@@ -37,21 +38,23 @@ const TutorMyCourses = () => {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this course? This cannot be undone.')) return
+    setActionError(null)
     try {
       await deleteCourse(id)
       setCourses(prev => prev.filter(c => c.id !== id))
     } catch (err: any) {
-      alert(err.message || 'Failed to delete course')
+      setActionError(err.message || 'Failed to delete course')
     }
   }
 
   const handleStatusToggle = async (course: CourseListItem) => {
     const newStatus = course.status === 'Published' ? 'Paused' : 'Published'
+    setActionError(null)
     try {
       await updateCourseStatus(course.id, newStatus)
       setCourses(prev => prev.map(c => c.id === course.id ? { ...c, status: newStatus } : c))
     } catch (err: any) {
-      alert(err.message || 'Failed to update status')
+      setActionError(err.message || 'Failed to update status')
     }
   }
 
@@ -78,6 +81,9 @@ const TutorMyCourses = () => {
 
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>
+      )}
+      {actionError && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{actionError}</div>
       )}
 
       {courses.length === 0 ? (

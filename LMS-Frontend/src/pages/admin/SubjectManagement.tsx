@@ -7,6 +7,8 @@ import { getAdminSubjects, createSubject, updateSubject, deleteSubject, Subject 
 const SubjectManagement = () => {
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [loading, setLoading] = useState(true)
+  const [pageError, setPageError] = useState<string | null>(null)
+  const [formError, setFormError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null)
@@ -20,10 +22,11 @@ const SubjectManagement = () => {
   const fetchSubjects = async () => {
     try {
       setLoading(true)
+      setPageError(null)
       const data = await getAdminSubjects()
       setSubjects(data)
     } catch (err: any) {
-      alert(err.message || 'Failed to fetch subjects')
+      setPageError(err.message || 'Failed to fetch subjects')
     } finally {
       setLoading(false)
     }
@@ -35,6 +38,7 @@ const SubjectManagement = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setFormError(null)
     try {
       if (editingSubject) {
         await updateSubject(editingSubject.id, formData)
@@ -46,17 +50,18 @@ const SubjectManagement = () => {
       setFormData({ name: '', description: '', isActive: true })
       fetchSubjects()
     } catch (err: any) {
-      alert(err.message || 'Action failed')
+      setFormError(err.message || 'Action failed')
     }
   }
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this subject?')) return
+    setPageError(null)
     try {
       await deleteSubject(id)
       fetchSubjects()
     } catch (err: any) {
-      alert(err.message || 'Failed to delete')
+      setPageError(err.message || 'Failed to delete subject')
     }
   }
 
@@ -77,6 +82,9 @@ const SubjectManagement = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      {pageError && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{pageError}</div>
+      )}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Subject Management</h1>
@@ -174,11 +182,14 @@ const SubjectManagement = () => {
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
             <div className="p-6 border-b flex items-center justify-between">
               <h2 className="text-xl font-bold">{editingSubject ? 'Edit Subject' : 'Add Subject'}</h2>
-              <button onClick={() => setIsModalOpen(false)} className="p-1 hover:bg-gray-100 rounded-lg">
+              <button onClick={() => { setIsModalOpen(false); setFormError(null) }} className="p-1 hover:bg-gray-100 rounded-lg">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              {formError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{formError}</div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Subject Name</label>
                 <input
@@ -213,7 +224,7 @@ const SubjectManagement = () => {
                 </label>
               </div>
               <div className="pt-4 flex gap-3">
-                <Button type="button" variant="outline" fullWidth onClick={() => setIsModalOpen(false)}>
+                <Button type="button" variant="outline" fullWidth onClick={() => { setIsModalOpen(false); setFormError(null) }}>
                   Cancel
                 </Button>
                 <Button type="submit" fullWidth>

@@ -258,6 +258,16 @@ public class ChangePasswordCommandHandler : IRequestHandler<ChangePasswordComman
             return Result.FailureResult("UNAUTHORIZED", "User not authenticated");
         }
 
+        // Validate new password complexity (validator not in MediatR pipeline)
+        if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 8)
+        {
+            return Result.FailureResult("WEAK_PASSWORD", "New password must be at least 8 characters");
+        }
+        if (!System.Text.RegularExpressions.Regex.IsMatch(request.NewPassword, @"(?=.*[a-z])(?=.*[A-Z])(?=.*\d)"))
+        {
+            return Result.FailureResult("WEAK_PASSWORD", "New password must contain at least one uppercase letter, one lowercase letter, and one number");
+        }
+
         var user = await _userRepository.GetByIdAsync(userId.Value, cancellationToken);
         if (user == null)
         {

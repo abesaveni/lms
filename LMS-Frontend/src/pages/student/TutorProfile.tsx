@@ -13,6 +13,7 @@ import { followTutor, unfollowTutor, getFollowStatus } from '../../services/foll
 import { getTutorById, TutorDto } from '../../services/tutorsApi'
 import { getCurrentUser } from '../../utils/auth'
 import { getSessions, SessionDto } from '../../services/sessionsApi'
+import { getCoursesByTutor, SubjectRate } from '../../services/courseApi'
 
 const TutorProfile = () => {
   const navigate = useNavigate()
@@ -24,7 +25,9 @@ const TutorProfile = () => {
   const [followerCount, setFollowerCount] = useState(0)
   const [sessions, setSessions] = useState<SessionDto[]>([])
   const [reviews, setReviews] = useState<ReviewDto[]>([])
+  const [subjectRates, setSubjectRates] = useState<SubjectRate[]>([])
   const [activeTab, setActiveTab] = useState('about')
+  const [profileNotice, setProfileNotice] = useState<{ type: 'info' | 'error'; text: string } | null>(null)
   const availabilityRef = useRef<HTMLDivElement>(null)
   const user = getCurrentUser()
   const isAuthenticated = !!user
@@ -46,6 +49,14 @@ const TutorProfile = () => {
         // Fetch tutor's upcoming sessions using UserId (database link for sessions)
         const sessionData = await getSessions({ tutorId: data.userId, upcoming: true })
         setSessions(sessionData.items)
+
+        // Fetch subject rates
+        try {
+          const ratesData = await getCoursesByTutor(data.userId)
+          setSubjectRates(ratesData.subjectRates || [])
+        } catch {
+          // Non-critical
+        }
 
         // Fetch tutor's reviews - Use UserId as backend expects it for followers/reviews
         const reviewData = await getTutorReviews(data.userId)
@@ -84,7 +95,7 @@ const TutorProfile = () => {
         availabilityRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       }, 100)
     } else {
-      alert('This tutor has no upcoming sessions scheduled. Please message them to request a session.')
+      setProfileNotice({ type: 'info', text: 'This tutor has no upcoming sessions scheduled. Please message them to request a session.' })
     }
   }
 
@@ -96,7 +107,7 @@ const TutorProfile = () => {
       return
     }
     if (!tutor?.userId) {
-      alert('Tutor details are unavailable. Please try again.')
+      setProfileNotice({ type: 'error', text: 'Tutor details are unavailable. Please try again.' })
       return
     }
     ;(async () => {
@@ -104,7 +115,7 @@ const TutorProfile = () => {
         await createChatRequest(tutor.userId)
         navigate('/student/inbox')
       } catch (err: any) {
-        alert(err.message || 'Failed to send chat request')
+        setProfileNotice({ type: 'error', text: err.message || 'Failed to send chat request' })
       }
     })()
   }
@@ -129,7 +140,7 @@ const TutorProfile = () => {
         setFollowerCount((prev) => prev + 1)
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to update follow status')
+      setProfileNotice({ type: 'error', text: err.message || 'Failed to update follow status' })
     }
   }
 
@@ -176,6 +187,11 @@ const TutorProfile = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {profileNotice && (
+        <div className={`mb-4 p-4 rounded-lg text-sm font-medium ${profileNotice.type === 'info' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+          {profileNotice.text}
+        </div>
+      )}
       {/* Tutor Header */}
       <Card className="mb-8">
         <div className="flex flex-col md:flex-row gap-6">
@@ -364,21 +380,48 @@ const TutorProfile = () => {
             <CardHeader>
               <CardTitle>Pricing</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="p-4 border border-gray-200 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-semibold">1-on-1 Session</span>
-                  <span className="text-2xl font-bold text-primary-600">₹{tutor.hourlyRate}</span>
-                </div>
-                <p className="text-sm text-gray-600">per hour</p>
-              </div>
-              <div className="p-4 border border-gray-200 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-semibold">Group Session</span>
-                  <span className="text-2xl font-bold text-primary-600">₹{tutor.hourlyRate}</span>
-                </div>
-                <p className="text-sm text-gray-600">per hour per student</p>
-              </div>
+            <CardContent className="space-y-3">
+              {subjectRates.length > 0 ? (
+                <>
+                  <div className="space-y-2">
+                    {subjectRates.map((rate, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-3 border border-gray-100 rounded-lg bg-gray-50/50">
+                        <span className="font-medium text-gray-800 text-sm">{rate.subjectName}</span>
+                        <div className="text-right">
+                          <div className="font-bold text-primary-600">₹{rate.hourlyRate}/hr</div>
+                          {rate.trialRate !== undefined && rate.trialRate !== null && rate.trialRate > 0 && (
+                            <div className="text-xs text-green-600">Trial: ₹{rate.trialRate}</div>
+                          )}
+                          {rate.trialRate === 0 && (
+                            <div className="text-xs text-green-600">Free trial</div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {(tutor.hourlyRateGroup || tutor.hourlyRate) && (
+                    <div className="flex items-center justify-between p-3 border border-gray-100 rounded-lg bg-gray-50/50">
+                      <span className="font-medium text-gray-800 text-sm">Group Session</span>
+                      <div className="font-bold text-primary-600">
+                        ₹{tutor.hourlyRateGroup || tutor.hourlyRate}/hr
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between p-3 border border-gray-100 rounded-lg bg-gray-50/50">
+                    <span className="font-medium text-gray-800 text-sm">1-on-1 Session</span>
+                    <span className="font-bold text-primary-600">₹{tutor.hourlyRate}/hr</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 border border-gray-100 rounded-lg bg-gray-50/50">
+                    <span className="font-medium text-gray-800 text-sm">Group Session</span>
+                    <span className="font-bold text-primary-600">
+                      ₹{tutor.hourlyRateGroup || tutor.hourlyRate}/hr
+                    </span>
+                  </div>
+                </>
+              )}
               <Button fullWidth onClick={handleBookSession}>
                 <Calendar className="mr-2 w-5 h-5" />
                 Book Session

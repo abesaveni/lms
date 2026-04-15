@@ -10,6 +10,7 @@ public class TutorProfile : BaseEntity
     public string? Headline { get; set; }
     public int YearsOfExperience { get; set; }
     public decimal HourlyRate { get; set; }
+    public decimal HourlyRateGroup { get; set; }
     public VerificationStatus VerificationStatus { get; set; } = VerificationStatus.NotStarted;
     public DateTime? VerifiedAt { get; set; }
     public Guid? VerifiedBy { get; set; }

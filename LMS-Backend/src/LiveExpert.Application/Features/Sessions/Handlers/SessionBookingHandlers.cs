@@ -86,16 +86,16 @@ public class BookSessionCommandHandler : IRequestHandler<BookSessionCommand, Res
                 return Result<BookingDto>.FailureResult("NOT_FOUND", "Session not found");
             }
 
-            // Check if session is full
-            if (session.CurrentStudents >= session.MaxStudents)
-            {
-                return Result<BookingDto>.FailureResult("SESSION_FULL", "Session is already full");
-            }
-
-            // Check if already booked
+            // Check if already booked FIRST (before capacity check, so pending bookings can retry payment)
             var existingBooking = await _bookingRepository.FirstOrDefaultAsync(
                 b => b.SessionId == request.SessionId && b.StudentId == userId.Value && b.BookingStatus != BookingStatus.Cancelled,
                 cancellationToken);
+
+            // Check if session is full (only when student doesn't already have a booking)
+            if (existingBooking == null && session.CurrentStudents >= session.MaxStudents)
+            {
+                return Result<BookingDto>.FailureResult("SESSION_FULL", "Session is already full");
+            }
 
             if (existingBooking != null)
             {
@@ -195,6 +195,44 @@ public class BookSessionCommandHandler : IRequestHandler<BookSessionCommand, Res
             };
 
             await _bookingRepository.AddAsync(booking, cancellationToken);
+
+            // Free session — skip Razorpay entirely and confirm immediately
+            if (totalAmount == 0)
+            {
+                booking.BookingStatus = BookingStatus.Confirmed;
+                var freePayment = new Payment
+                {
+                    Id = Guid.NewGuid(),
+                    StudentId = userId.Value,
+                    TutorId = session.TutorId,
+                    SessionId = session.Id,
+                    BaseAmount = 0,
+                    PlatformFee = 0,
+                    TotalAmount = 0,
+                    Status = PaymentStatus.Success,
+                    PaymentGateway = "Free",
+                    GatewayOrderId = $"free_{booking.Id}",
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+                await _paymentRepository.AddAsync(freePayment, cancellationToken);
+                booking.PaymentId = freePayment.Id;
+                await _unitOfWork.CommitTransactionAsync(cancellationToken);
+
+                return Result<BookingDto>.SuccessResult(new BookingDto
+                {
+                    Id = booking.Id,
+                    SessionId = booking.SessionId,
+                    Status = booking.BookingStatus,
+                    HoursBooked = booking.HoursBooked,
+                    BaseAmount = 0,
+                    PlatformFee = 0,
+                    TotalAmount = 0,
+                    RazorpayOrderId = null,
+                    RazorpayKey = null,
+                    CreatedAt = booking.CreatedAt
+                });
+            }
 
             var metadata = new Dictionary<string, string>
             {

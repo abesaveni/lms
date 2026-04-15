@@ -106,23 +106,25 @@ public class CreateSessionCommandHandler : IRequestHandler<CreateSessionCommand,
 
         // Create Google Calendar event with Meet link
         var endTime = request.ScheduledAt.AddMinutes(request.Duration);
-        string meetUrl = "https://meet.google.com/test-session-" + Guid.NewGuid().ToString().Substring(0, 8);
+        // Default to a real Jitsi meeting (works without Google Calendar OAuth)
+        var jitsiCode = Guid.NewGuid().ToString("N").Substring(0, 12).ToLower();
+        string meetUrl = $"https://meet.jit.si/LiveExpert-{jitsiCode}";
         string? calendarEventId = null;
 
         try
         {
-            // Try to create the link, but don't fail if it's not configured
+            // Try to create a real Google Meet link if calendar is configured
             var realMeetUrl = await _googleCalendarService.CreateMeetingLinkAsync(
                 request.Title,
                 request.ScheduledAt,
                 endTime,
                 cancellationToken);
-            
+
             if (!string.IsNullOrEmpty(realMeetUrl)) meetUrl = realMeetUrl;
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to create real Google Calendar event, using dummy link for testing.");
+            _logger.LogWarning(ex, "Google Calendar not configured — using Jitsi fallback for meeting link.");
         }
 
         // Encrypt Meet URL

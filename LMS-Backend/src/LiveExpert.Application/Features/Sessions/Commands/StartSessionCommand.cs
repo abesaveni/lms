@@ -75,32 +75,42 @@ public class StartSessionCommandHandler : IRequestHandler<StartSessionCommand, R
         // Get Meet link
         var meetLink = await _meetLinkRepository.FirstOrDefaultAsync(
             ml => ml.SessionId == request.SessionId && ml.IsActive, cancellationToken);
-            
+
         string? decryptedUrl = null;
-        
+
         if (meetLink == null)
         {
-            // FALLBACK: Create a dummy meet link for testing if Google Calendar is not connected
-            var meetCode = Guid.NewGuid().ToString("N").Substring(0, 10).ToLower();
-            var fallbackUrl = $"https://meet.jit.si/LiveExpert-Test-{meetCode}";
-            
+            // No link stored yet — create a Jitsi meeting (works without Google Calendar)
+            var meetCode = Guid.NewGuid().ToString("N").Substring(0, 12).ToLower();
+            var jitsiUrl = $"https://meet.jit.si/LiveExpert-{meetCode}";
+
             meetLink = new SessionMeetLink
             {
                 Id = Guid.NewGuid(),
                 SessionId = request.SessionId,
-                MeetUrl = _encryptionService.Encrypt(fallbackUrl),
+                MeetUrl = _encryptionService.Encrypt(jitsiUrl),
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
-            
+
             await _meetLinkRepository.AddAsync(meetLink, cancellationToken);
-            decryptedUrl = fallbackUrl;
+            decryptedUrl = jitsiUrl;
         }
-        else 
+        else
         {
-            // Decrypt existing Meet URL
             decryptedUrl = _encryptionService.Decrypt(meetLink.MeetUrl);
+
+            // If a stale fake Google Meet URL was stored (from old code), replace it with Jitsi
+            if (decryptedUrl.Contains("meet.google.com/test-session-") ||
+                decryptedUrl.Contains("meet.google.com/xxx"))
+            {
+                var meetCode = Guid.NewGuid().ToString("N").Substring(0, 12).ToLower();
+                decryptedUrl = $"https://meet.jit.si/LiveExpert-{meetCode}";
+                meetLink.MeetUrl = _encryptionService.Encrypt(decryptedUrl);
+                meetLink.UpdatedAt = DateTime.UtcNow;
+                await _meetLinkRepository.UpdateAsync(meetLink, cancellationToken);
+            }
         }
         
         // Update session status

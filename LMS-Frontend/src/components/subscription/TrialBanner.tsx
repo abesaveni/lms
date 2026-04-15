@@ -14,6 +14,7 @@ export function TrialBanner() {
   const { trialActive, daysLeftInTrial, subscriptionActive, isLoading, refetch } = useSubscription()
   const [dismissed, setDismissed] = useState(false)
   const [paying, setPaying] = useState(false)
+  const [payError, setPayError] = useState<string | null>(null)
 
   // Show whenever trial is active and not yet subscribed
   // Urgency: amber when > 3 days, orange/red when ≤ 3 days
@@ -22,6 +23,7 @@ export function TrialBanner() {
 
   const handlePayNow = async () => {
     setPaying(true)
+    setPayError(null)
     try {
       const order = await createSubscriptionOrder()
 
@@ -43,7 +45,7 @@ export function TrialBanner() {
             refetch()
             setDismissed(true)
           } catch (err) {
-            alert('Payment verified but activation failed. Please contact support.')
+            setPayError('Payment verified but activation failed. Please contact support.')
           }
         },
         prefill: {},
@@ -65,13 +67,19 @@ export function TrialBanner() {
       rzp.open()
     } catch (err) {
       console.error('Payment error:', err)
-      alert('Could not initiate payment. Please try again.')
+      setPayError('Could not initiate payment. Please try again.')
     } finally {
       setPaying(false)
     }
   }
 
   return (
+    <>
+    {payError && (
+      <div className="w-full bg-red-50 border-b border-red-200 px-4 py-2 text-sm text-red-700 text-center">
+        {payError}
+      </div>
+    )}
     <AnimatePresence>
       {shouldShow && (
         <motion.div
@@ -116,5 +124,6 @@ export function TrialBanner() {
         </motion.div>
       )}
     </AnimatePresence>
+    </>
   )
 }

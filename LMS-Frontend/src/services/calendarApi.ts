@@ -25,12 +25,8 @@ export const getCalendarAuthUrl = async (): Promise<string> => {
  * Check if Google Calendar is connected
  */
 export const checkCalendarConnection = async (): Promise<boolean> => {
-  try {
-    const response = await apiGet<ApiResponse<boolean>>('/calendar/oauth/status')
-    return response.success && response.data === true
-  } catch (error) {
-    return false
-  }
+  // Google Calendar is no longer required — Jitsi is used for video conferencing.
+  return true
 }
 
 /**

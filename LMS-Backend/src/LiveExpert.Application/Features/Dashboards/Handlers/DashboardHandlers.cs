@@ -286,7 +286,11 @@ public class GetTutorDashboardQueryHandler : IRequestHandler<GetTutorDashboardQu
             UpcomingSessionsCount = upcomingSessions.Count,
             TotalEarnings = earnings.Sum(e => e.NetAmount),
             AvailableBalance = earnings.Where(e => e.Status == EarningStatus.Available).Sum(e => e.NetAmount),
-            TotalStudents = 0, // Would need to count unique students
+            TotalStudents = sessions.Any()
+                ? (await _bookingRepository.FindAsync(
+                    b => sessions.Select(s => s.Id).Contains(b.SessionId) && b.BookingStatus != BookingStatus.Cancelled,
+                    cancellationToken)).Select(b => b.StudentId).Distinct().Count()
+                : 0,
             AverageRating = tutorProfile?.AverageRating ?? 0,
             TotalReviews = tutorProfile?.TotalReviews ?? 0,
             UpcomingSessions = upcomingSessionDtos,
@@ -301,17 +305,20 @@ public class GetTutorDashboardQueryHandler : IRequestHandler<GetTutorDashboardQu
 public class GetTutorStatsQueryHandler : IRequestHandler<GetTutorStatsQuery, Result<TutorStatsDto>>
 {
     private readonly IRepository<Session> _sessionRepository;
+    private readonly IRepository<SessionBooking> _bookingRepository;
     private readonly IRepository<TutorEarning> _tutorEarningRepository;
     private readonly IRepository<TutorProfile> _tutorProfileRepository;
     private readonly ICurrentUserService _currentUserService;
 
     public GetTutorStatsQueryHandler(
         IRepository<Session> sessionRepository,
+        IRepository<SessionBooking> bookingRepository,
         IRepository<TutorEarning> tutorEarningRepository,
         IRepository<TutorProfile> tutorProfileRepository,
         ICurrentUserService currentUserService)
     {
         _sessionRepository = sessionRepository;
+        _bookingRepository = bookingRepository;
         _tutorEarningRepository = tutorEarningRepository;
         _tutorProfileRepository = tutorProfileRepository;
         _currentUserService = currentUserService;
@@ -334,7 +341,11 @@ public class GetTutorStatsQueryHandler : IRequestHandler<GetTutorStatsQuery, Res
             TotalHoursTaught = completedSessions.Count * 1, // Assuming 1 hour per session
             TotalEarnings = earnings.Sum(e => e.NetAmount),
             TotalWithdrawn = earnings.Where(e => e.Status == EarningStatus.Paid).Sum(e => e.NetAmount),
-            UniqueStudents = 0,
+            UniqueStudents = sessions.Any()
+                ? (await _bookingRepository.FindAsync(
+                    b => sessions.Select(s => s.Id).Contains(b.SessionId) && b.BookingStatus != BookingStatus.Cancelled,
+                    cancellationToken)).Select(b => b.StudentId).Distinct().Count()
+                : 0,
             AverageRating = (double)(tutorProfile?.AverageRating ?? 0),
             TotalReviews = tutorProfile?.TotalReviews ?? 0,
             SessionsBySubject = new Dictionary<string, int>(),

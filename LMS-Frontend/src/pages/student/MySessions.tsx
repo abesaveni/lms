@@ -23,6 +23,9 @@ const MySessions = () => {
   const [reviewRating, setReviewRating] = useState(5)
   const [reviewComment, setReviewComment] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [reviewError, setReviewError] = useState<string | null>(null)
+  const [reviewSuccess, setReviewSuccess] = useState(false)
+  const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const handleOpenReviewModal = (session: SessionDto) => {
     setSelectedSession(session)
@@ -48,8 +51,9 @@ const MySessions = () => {
   }, [])
 
   const handleSubmitReview = async () => {
+    setReviewError(null)
     if (!selectedSession || !reviewComment.trim()) {
-      alert('Please provide a comment.')
+      setReviewError('Please provide a comment.')
       return
     }
 
@@ -60,13 +64,16 @@ const MySessions = () => {
         rating: reviewRating,
         comment: reviewComment
       })
-      
-      alert('Thank you for your review!')
-      setIsReviewModalOpen(false)
-      // Refresh sessions to show updated status if applicable (though backend mainly updates tutor profile)
+
+      setReviewSuccess(true)
+      setTimeout(() => {
+        setIsReviewModalOpen(false)
+        setReviewSuccess(false)
+      }, 1500)
+      // Refresh sessions to show updated status if applicable
       await loadSessions()
     } catch (err: any) {
-      alert(err.message || 'Failed to submit review')
+      setReviewError(err.message || 'Failed to submit review')
     } finally {
       setIsSubmitting(false)
     }
@@ -74,13 +81,13 @@ const MySessions = () => {
 
   const handleCancelBooking = async (sessionId: string) => {
     if (!confirm("Are you sure you want to cancel this booking?")) return;
-    
+    setActionMessage(null)
     try {
       await cancelBooking(sessionId);
-      alert("Booking cancelled successfully.");
+      setActionMessage({ type: 'success', text: 'Booking cancelled successfully.' })
       await loadSessions();
     } catch (err: any) {
-      alert(err.message || "Failed to cancel booking");
+      setActionMessage({ type: 'error', text: err.message || "Failed to cancel booking" })
     }
   }
 
@@ -148,6 +155,12 @@ const MySessions = () => {
         <h1 className="text-3xl font-bold text-gray-900 mb-2">My Sessions</h1>
         <p className="text-gray-600">Manage your learning sessions</p>
       </div>
+
+      {actionMessage && (
+        <div className={`mb-4 p-4 rounded-lg text-sm font-medium ${actionMessage.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+          {actionMessage.text}
+        </div>
+      )}
 
       <Tabs defaultValue="upcoming">
         <TabsList>
@@ -381,11 +394,18 @@ const MySessions = () => {
             />
           </div>
 
+          {reviewError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{reviewError}</div>
+          )}
+          {reviewSuccess && (
+            <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm font-medium">Thank you for your review!</div>
+          )}
+
           <div className="flex gap-3 pt-2">
             <Button
               variant="outline"
               fullWidth
-              onClick={() => setIsReviewModalOpen(false)}
+              onClick={() => { setIsReviewModalOpen(false); setReviewError(null); setReviewSuccess(false) }}
               disabled={isSubmitting}
             >
               Cancel
@@ -394,7 +414,7 @@ const MySessions = () => {
               fullWidth
               onClick={handleSubmitReview}
               isLoading={isSubmitting}
-              disabled={!reviewComment.trim()}
+              disabled={!reviewComment.trim() || reviewSuccess}
             >
               Submit Review
             </Button>

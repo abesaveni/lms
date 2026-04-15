@@ -21,7 +21,6 @@ public class SessionsController : BaseController
     /// </summary>
     [HttpPost]
     [Authorize]
-    [RequireCalendarConsent]
     [ProducesResponseType(typeof(SessionDto), 201)]
     [ProducesResponseType(400)]
     [ProducesResponseType(403)]
@@ -188,11 +187,11 @@ public class SessionsController : BaseController
     }
 
     /// <summary>
-    /// Join session - Student only (returns temporary Meet URL) - Requires Google Calendar consent
+    /// Join session - Student only (returns temporary Meet URL)
+    /// Students use the tutor's meet link — no calendar consent required on their side
     /// </summary>
     [HttpPost("{sessionId}/join")]
     [Authorize(Roles = "Student")]
-    [RequireCalendarConsent]
     [ProducesResponseType(typeof(Result<LiveExpert.Application.Features.Sessions.Commands.JoinSessionResponse>), 200)]
     [ProducesResponseType(403)]
     [ProducesResponseType(404)]

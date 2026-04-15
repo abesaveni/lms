@@ -20,17 +20,19 @@ export default function MockInterview() {
   const [answer, setAnswer] = useState('')
   const [loading, setLoading] = useState(false)
   const [report, setReport] = useState('')
+  const [interviewError, setInterviewError] = useState<string | null>(null)
 
   const questionNumber = history.length + 1
 
   const startInterview = async () => {
     setLoading(true)
+    setInterviewError(null)
     try {
       const res = await startMockInterview({ role, level, previousAnswer: '' })
       setCurrentQuestion(res.response)
       setFeedback('')
       setStep('interview')
-    } catch (e: any) { alert(e.message) }
+    } catch (e: any) { setInterviewError(e.message) }
     finally { setLoading(false) }
   }
 
@@ -56,7 +58,7 @@ export default function MockInterview() {
         setHistory(newHistory)
         setAnswer('')
       }
-    } catch (e: any) { alert(e.message) }
+    } catch (e: any) { setInterviewError(e.message) }
     finally { setLoading(false) }
   }
 
@@ -74,6 +76,10 @@ export default function MockInterview() {
             <p className="text-sm text-gray-500">Practice with AI — get real feedback</p>
           </div>
         </div>
+
+        {interviewError && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{interviewError}</div>
+        )}
 
         <AnimatePresence mode="wait">
           {step === 'setup' && (

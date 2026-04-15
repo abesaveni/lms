@@ -1,4 +1,4 @@
-import { ReactNode } from 'react'
+import { ReactNode, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Lock, Zap } from 'lucide-react'
 import { useSubscription } from '../../hooks/useSubscription'
@@ -40,7 +40,10 @@ export function PaidGuard({ children, featureName }: PaidGuardProps) {
   }
 
   // Locked — show upgrade prompt
+  const [payError, setPayError] = useState<string | null>(null)
+
   const handlePayNow = async () => {
+    setPayError(null)
     try {
       const order = await createSubscriptionOrder()
       await loadRazorpay()
@@ -61,7 +64,7 @@ export function PaidGuard({ children, featureName }: PaidGuardProps) {
             window.dispatchEvent(new CustomEvent('subscription:activated'))
             refetch()
           } catch {
-            alert('Payment verified but activation failed. Please contact support.')
+            setPayError('Payment verified but activation failed. Please contact support.')
           }
         },
         prefill: {},
@@ -69,7 +72,7 @@ export function PaidGuard({ children, featureName }: PaidGuardProps) {
       }
       new window.Razorpay(options).open()
     } catch (err: any) {
-      alert(err?.message || 'Could not initiate payment. Please try again.')
+      setPayError(err?.message || 'Could not initiate payment. Please try again.')
     }
   }
 
@@ -94,6 +97,11 @@ export function PaidGuard({ children, featureName }: PaidGuardProps) {
           Pay ₹100/month to Unlock
         </button>
         <p className="text-xs text-gray-400 mt-3">Secured by Razorpay · Cancel anytime</p>
+        {payError && (
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            {payError}
+          </div>
+        )}
       </motion.div>
     </div>
   )

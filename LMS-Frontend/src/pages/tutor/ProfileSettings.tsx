@@ -14,6 +14,8 @@ const TutorProfileSettings = () => {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [profileMessage, setProfileMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [passwordMessage, setPasswordMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -24,6 +26,8 @@ const TutorProfileSettings = () => {
     headline: '',
     hourlyRate1on1: 0,
     hourlyRateGroup: 0,
+    location: '',
+    memberSince: '',
     profilePictureUrl: '',
     profilePictureBase64: '',
     profilePictureFileName: '',
@@ -48,9 +52,12 @@ const TutorProfileSettings = () => {
           education: data.education || '',
           headline: data.headline || '',
           hourlyRate1on1: data.hourlyRate || 0,
+          hourlyRateGroup: data.hourlyRateGroup || 0,
+          location: data.location || '',
+          memberSince: data.memberSince ? new Date(data.memberSince).toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' }) : '',
           profilePictureUrl: data.profilePictureUrl || '',
           language: data.languages || 'English',
-          timezone: 'UTC', // Default since not in API yet
+          timezone: 'UTC',
         })
       } catch (error) {
         console.error('Failed to fetch profile:', error)
@@ -63,6 +70,7 @@ const TutorProfileSettings = () => {
 
   const handleSaveProfile = async () => {
     setSaving(true)
+    setProfileMessage(null)
     try {
       await updateTutorProfile({
         firstName: formData.firstName,
@@ -71,13 +79,15 @@ const TutorProfileSettings = () => {
         headline: formData.headline,
         education: formData.education,
         hourlyRate: formData.hourlyRate1on1,
+        hourlyRateGroup: formData.hourlyRateGroup,
         phoneNumber: formData.phone,
         profilePictureUrl: formData.profilePictureUrl,
         profilePictureBase64: formData.profilePictureBase64,
         profilePictureFileName: formData.profilePictureFileName,
         languages: formData.language,
         language: formData.language,
-        timezone: formData.timezone
+        timezone: formData.timezone,
+        location: formData.location,
       })
       
       // Clear base64 after successful save to avoid re-sending it
@@ -87,8 +97,8 @@ const TutorProfileSettings = () => {
         profilePictureFileName: ''
       }))
       
-      alert('Profile updated successfully!')
-      
+      setProfileMessage({ type: 'success', text: 'Profile updated successfully!' })
+
       // Update the user in localStorage so the header/sidebar reflect the new image immediately
       const currentUser = getCurrentUser();
       if (currentUser) {
@@ -100,22 +110,34 @@ const TutorProfileSettings = () => {
         // Dispatch event to notify Header and Sidebar
         window.dispatchEvent(new Event('tokenUpdated'));
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Update failed:', error)
-      alert('Failed to update profile')
+      setProfileMessage({ type: 'error', text: error?.message || 'Failed to update profile' })
     } finally {
       setSaving(false)
     }
   }
 
   const handleUpdatePassword = async () => {
+    setPasswordMessage(null)
+
     if (!formData.currentPassword || !formData.newPassword || !formData.confirmPassword) {
-      alert('All password fields are required')
+      setPasswordMessage({ type: 'error', text: 'All password fields are required' })
+      return
+    }
+
+    if (formData.newPassword.length < 8) {
+      setPasswordMessage({ type: 'error', text: 'New password must be at least 8 characters' })
+      return
+    }
+
+    if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.newPassword)) {
+      setPasswordMessage({ type: 'error', text: 'New password must contain at least one uppercase letter, one lowercase letter, and one number' })
       return
     }
 
     if (formData.newPassword !== formData.confirmPassword) {
-      alert('New passwords do not match')
+      setPasswordMessage({ type: 'error', text: 'New passwords do not match' })
       return
     }
 
@@ -125,7 +147,7 @@ const TutorProfileSettings = () => {
         currentPassword: formData.currentPassword,
         newPassword: formData.newPassword
       })
-      alert('Password updated successfully!')
+      setPasswordMessage({ type: 'success', text: 'Password updated successfully! Use your new password on next login.' })
       setFormData(prev => ({
         ...prev,
         currentPassword: '',
@@ -134,7 +156,7 @@ const TutorProfileSettings = () => {
       }))
     } catch (error: any) {
       console.error('Password update failed:', error)
-      alert(error.message || 'Failed to update password')
+      setPasswordMessage({ type: 'error', text: error.message || 'Failed to update password' })
     } finally {
       setSaving(false)
     }
@@ -314,6 +336,23 @@ const TutorProfileSettings = () => {
                   onChange={(e) => setFormData({ ...formData, education: e.target.value })}
                 />
               </div>
+              <Input
+                label="Location (City, Country)"
+                value={formData.location}
+                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                placeholder="e.g. Mumbai, India"
+              />
+              {formData.memberSince && (
+                <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 px-4 py-2.5 rounded-lg border border-gray-200">
+                  <span className="font-medium text-gray-700">Member since:</span>
+                  <span>{formData.memberSince}</span>
+                </div>
+              )}
+              {profileMessage && (
+                <div className={`p-3 rounded-lg text-sm font-medium ${profileMessage.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                  {profileMessage.text}
+                </div>
+              )}
               <div className="pt-4 border-t border-gray-200">
                 <Button onClick={handleSaveProfile} disabled={saving}>
                   <Save className="mr-2 w-5 h-5" />
@@ -330,36 +369,45 @@ const TutorProfileSettings = () => {
               <CardTitle>Pricing Settings</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid sm:grid-cols-2 gap-6 max-w-lg">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    1-on-1 Session Rate (per hour)
+                    1-on-1 Hourly Rate (₹)
                   </label>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                    <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">₹</span>
                     <Input
                       type="number"
                       value={formData.hourlyRate1on1}
                       onChange={(e) => setFormData({ ...formData, hourlyRate1on1: Number(e.target.value) })}
                       className="pl-8"
+                      min="0"
                     />
                   </div>
+                  <p className="text-xs text-gray-500 mt-1.5">Your default 1-on-1 session rate shown on your public profile.</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Group Session Rate (per hour per student)
+                    Group Session Rate (₹)
                   </label>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                    <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">₹</span>
                     <Input
                       type="number"
                       value={formData.hourlyRateGroup}
                       onChange={(e) => setFormData({ ...formData, hourlyRateGroup: Number(e.target.value) })}
                       className="pl-8"
+                      min="0"
                     />
                   </div>
+                  <p className="text-xs text-gray-500 mt-1.5">Your default group session rate shown on your public profile.</p>
                 </div>
               </div>
+              {profileMessage && (
+                <div className={`p-3 rounded-lg text-sm font-medium ${profileMessage.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                  {profileMessage.text}
+                </div>
+              )}
               <div className="pt-4 border-t border-gray-200">
                 <Button onClick={handleSaveProfile} disabled={saving}>
                   <Save className="mr-2 w-5 h-5" />
@@ -387,12 +435,26 @@ const TutorProfileSettings = () => {
               <CardTitle>Change Password</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
+              {passwordMessage && (
+                <div className={`px-4 py-3 rounded-lg text-sm font-medium ${passwordMessage.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                  {passwordMessage.text}
+                </div>
+              )}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-700">
+                <p className="font-medium mb-1">Password requirements:</p>
+                <ul className="list-disc list-inside space-y-0.5">
+                  <li>At least 8 characters</li>
+                  <li>At least one uppercase letter (A–Z)</li>
+                  <li>At least one lowercase letter (a–z)</li>
+                  <li>At least one number (0–9)</li>
+                </ul>
+              </div>
               <div className="relative">
                 <Input
                   label="Current Password"
                   type={showPassword ? 'text' : 'password'}
                   value={formData.currentPassword}
-                  onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
+                  onChange={(e) => { setPasswordMessage(null); setFormData({ ...formData, currentPassword: e.target.value }) }}
                   className="pr-10"
                 />
                 <button
@@ -406,13 +468,13 @@ const TutorProfileSettings = () => {
                 label="New Password"
                 type="password"
                 value={formData.newPassword}
-                onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
+                onChange={(e) => { setPasswordMessage(null); setFormData({ ...formData, newPassword: e.target.value }) }}
               />
               <Input
                 label="Confirm New Password"
                 type="password"
                 value={formData.confirmPassword}
-                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                onChange={(e) => { setPasswordMessage(null); setFormData({ ...formData, confirmPassword: e.target.value }) }}
               />
               <div className="pt-4 border-t border-gray-200">
                 <Button onClick={handleUpdatePassword} disabled={saving}>
@@ -460,6 +522,11 @@ const TutorProfileSettings = () => {
                   <option value="Europe/London">Europe/London</option>
                 </select>
               </div>
+              {profileMessage && (
+                <div className={`p-3 rounded-lg text-sm font-medium ${profileMessage.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                  {profileMessage.text}
+                </div>
+              )}
               <div className="pt-4 border-t border-gray-200">
                 <Button onClick={handleSaveProfile} disabled={saving}>
                   <Save className="mr-2 w-5 h-5" />

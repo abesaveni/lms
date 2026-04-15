@@ -5,39 +5,38 @@ import { Avatar } from '../../components/ui/Avatar'
 import { Badge } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import { useNavigate } from 'react-router-dom'
-import { getTutorProfile, TutorProfileDto } from '../../services/tutorApi'
+import { getTutorProfile, getTutorDashboardStats, TutorProfileDto } from '../../services/tutorApi'
 
 const TutorProfile = () => {
   const navigate = useNavigate()
   const [profile, setProfile] = useState<TutorProfileDto | null>(null)
   const [loading, setLoading] = useState(true)
   const [totalEarnings, setTotalEarnings] = useState<number | null>(null)
+  const [totalStudents, setTotalStudents] = useState(0)
+  const [completedSessions, setCompletedSessions] = useState(0)
+  const [averageRating, setAverageRating] = useState(0)
 
   useEffect(() => {
-    const fetchProfile = async () => {
+    const fetchAll = async () => {
       try {
-        const data = await getTutorProfile()
+        const [data, stats] = await Promise.all([
+          getTutorProfile(),
+          getTutorDashboardStats().catch(() => null),
+        ])
         setProfile(data)
+        if (stats) {
+          setTotalStudents(stats.totalStudents)
+          setCompletedSessions(stats.completedSessions)
+          setAverageRating(stats.averageRating)
+          setTotalEarnings(stats.totalEarnings)
+        }
       } catch (error) {
         console.error('Failed to fetch profile:', error)
       } finally {
         setLoading(false)
       }
     }
-    fetchProfile()
-  }, [])
-
-  useEffect(() => {
-    const fetchEarnings = async () => {
-      try {
-        const { apiGet } = await import('../../services/api')
-        const data = await apiGet<{ totalEarnings?: number; available?: number; pending?: number }>('/tutor/earnings/summary')
-        setTotalEarnings(data.totalEarnings ?? data.available ?? 0)
-      } catch {
-        // Non-critical — leave as null
-      }
-    }
-    fetchEarnings()
+    fetchAll()
   }, [])
 
   if (loading) {
@@ -49,9 +48,9 @@ const TutorProfile = () => {
   }
 
   const stats = [
-    { label: 'Total Students', value: profile?.totalSessions || 0 }, // Using sessions as proxy for demo
-    { label: 'Sessions Completed', value: profile?.totalSessions || 0 },
-    { label: 'Average Rating', value: profile?.averageRating || 0 },
+    { label: 'Total Students', value: totalStudents },
+    { label: 'Sessions Completed', value: completedSessions },
+    { label: 'Average Rating', value: averageRating > 0 ? averageRating.toFixed(1) : (profile?.averageRating || 0) },
     { label: 'Total Earnings', value: totalEarnings !== null ? `₹${totalEarnings.toLocaleString('en-IN')}` : '...' },
   ]
 
@@ -99,7 +98,7 @@ const TutorProfile = () => {
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="flex items-center gap-3 text-gray-600">
                       <Calendar className="w-5 h-5" />
-                      <span>{profile ? 'Member' : '-'}</span>
+                      <span>{profile?.memberSince ? `Member since ${new Date(profile.memberSince).toLocaleDateString('en-IN', { year: 'numeric', month: 'long' })}` : '-'}</span>
                     </div>
                     <div className="flex items-center gap-3 text-gray-600">
                       <Phone className="w-5 h-5" />
@@ -107,7 +106,7 @@ const TutorProfile = () => {
                     </div>
                     <div className="flex items-center gap-3 text-gray-600">
                       <MapPin className="w-5 h-5" />
-                      <span>{(profile as any)?.location || (profile as any)?.city || 'Location not set'}</span>
+                      <span>{profile?.location || 'Location not set'}</span>
                     </div>
                     <div className="flex items-center gap-3 text-gray-600">
                       <Mail className="w-5 h-5" />
@@ -160,11 +159,11 @@ const TutorProfile = () => {
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="p-4 border border-gray-200 rounded-lg">
                   <p className="text-sm text-gray-600 mb-1">1-on-1 Session</p>
-                  <p className="text-2xl font-bold text-gray-900">${profile?.hourlyRate || 0}/hr</p>
+                  <p className="text-2xl font-bold text-gray-900">₹{profile?.hourlyRate || 0}/hr</p>
                 </div>
                 <div className="p-4 border border-gray-200 rounded-lg">
                   <p className="text-sm text-gray-600 mb-1">Group Session</p>
-                  <p className="text-2xl font-bold text-gray-900">-</p>
+                  <p className="text-2xl font-bold text-gray-900">{profile?.hourlyRateGroup ? `₹${profile.hourlyRateGroup}/hr` : '-'}</p>
                 </div>
               </div>
             </CardContent>

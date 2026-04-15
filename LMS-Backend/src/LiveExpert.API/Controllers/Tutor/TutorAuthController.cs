@@ -192,11 +192,11 @@ public class TutorAuthController : ControllerBase
         catch { /* logged inside EmailService */ }
 
         var message = emailSent
-            ? "Verification code sent to your email"
-            : "Email delivery failed — your OTP is shown on screen";
+            ? "Verification code sent to your email (also shown below as backup)"
+            : "Email delivery failed — use the OTP shown below";
 
-        // Always return OTP on screen when email fails (temporary until SMTP is fixed)
-        return Ok(new { success = true, message, devOtp = !emailSent ? code : null });
+        // Always return OTP on screen so users can verify even if email goes to spam
+        return Ok(new { success = true, message, devOtp = code });
     }
 
     /// <summary>

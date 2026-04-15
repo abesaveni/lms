@@ -15,6 +15,8 @@ const BookSession = () => {
   const [hours, setHours] = useState(1)
   const [pricing, setPricing] = useState<{ baseAmount: number; platformFee: number; totalAmount: number } | null>(null)
   const [isPaying, setIsPaying] = useState(false)
+  const [bookingError, setBookingError] = useState<string | null>(null)
+  const [bookingSuccess, setBookingSuccess] = useState(false)
 
   useEffect(() => {
     const loadSession = async () => {
@@ -22,7 +24,7 @@ const BookSession = () => {
       try {
         const data = await getSessionById(sessionId)
         setSession(data)
-        
+
         // Auto-fill date and time from the dynamic session data
         if (data.scheduledAt) {
           const dateObj = new Date(data.scheduledAt)
@@ -32,7 +34,7 @@ const BookSession = () => {
           setSelectedTime(timeStr)
         }
       } catch (err: any) {
-        alert(err.message || 'Failed to load session')
+        setBookingError(err.message || 'Failed to load session')
       }
     }
     loadSession()
@@ -54,9 +56,18 @@ const BookSession = () => {
     loadPricing()
   }, [sessionId, session, hours])
 
+  const isSessionExpired = session
+    ? new Date() > new Date(new Date(session.scheduledAt).getTime() + (session.duration || 60) * 60000)
+    : false
+
   const handleBooking = async () => {
+    setBookingError(null)
     if (!sessionId || !session || !pricing) {
-      alert('Session details missing.')
+      setBookingError('Session details missing. Please refresh the page.')
+      return
+    }
+    if (isSessionExpired) {
+      setBookingError('This session has already ended and is no longer available for booking.')
       return
     }
     setIsPaying(true)
@@ -66,9 +77,17 @@ const BookSession = () => {
         hours: session.pricingType === 'Hourly' ? hours : undefined,
       })
 
+      // Free session — backend already confirmed it, no payment needed
+      if (!booking.razorpayOrderId) {
+        setBookingSuccess(true)
+        setTimeout(() => navigate('/student/my-sessions'), 2000)
+        setIsPaying(false)
+        return
+      }
+
       await openRazorpayCheckout(booking)
     } catch (err: any) {
-      alert(err.message || 'Failed to book session')
+      setBookingError(err.message || 'Failed to book session')
       setIsPaying(false)
     }
   }
@@ -76,7 +95,7 @@ const BookSession = () => {
   const openRazorpayCheckout = async (booking: any) => {
     const loaded = await loadRazorpayScript()
     if (!loaded) {
-      alert('Failed to load Razorpay. Please try again.')
+      setBookingError('Failed to load payment gateway. Please try again.')
       setIsPaying(false)
       return
     }
@@ -95,10 +114,10 @@ const BookSession = () => {
             razorpayPaymentId: response.razorpay_payment_id,
             razorpaySignature: response.razorpay_signature,
           })
-          alert('Payment successful! Booking request submitted.')
-          navigate('/student/my-sessions')
+          setBookingSuccess(true)
+          setTimeout(() => navigate('/student/my-sessions'), 2000)
         } catch (err: any) {
-          alert(err.message || 'Payment verification failed')
+          setBookingError(err.message || 'Payment verification failed')
         } finally {
           setIsPaying(false)
         }
@@ -141,6 +160,17 @@ const BookSession = () => {
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Book Session</h1>
         <p className="text-gray-600">Complete your booking details</p>
       </div>
+
+      {bookingSuccess && (
+        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700 font-medium">
+          Payment successful! Booking request submitted. Redirecting to My Sessions...
+        </div>
+      )}
+      {bookingError && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+          {bookingError}
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Booking Form */}
@@ -246,7 +276,7 @@ const BookSession = () => {
                 <span className="text-gray-900 font-semibold">Payable</span>
                 <span className="text-lg font-bold text-gray-900">₹{pricing?.totalAmount ?? 0}</span>
               </div>
-              <Button fullWidth onClick={handleBooking} disabled={isPaying || !pricing}>
+              <Button fullWidth onClick={handleBooking} disabled={isPaying || !pricing || isSessionExpired}>
                 {isPaying ? 'Processing...' : 'Pay & Confirm Booking'}
               </Button>
             </CardContent>

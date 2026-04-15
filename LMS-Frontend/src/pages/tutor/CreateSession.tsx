@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Video, Link as LinkIcon } from 'lucide-react'
+import { Video } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
@@ -11,8 +11,7 @@ const CreateSession = () => {
   const [subjects, setSubjects] = useState<TeacherSubjectDto[]>([])
   const [isLoadingSubjects, setIsLoadingSubjects] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [googleMeetLink, setGoogleMeetLink] = useState('')
-  const [isGeneratingLink, setIsGeneratingLink] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   const [formData, setFormData] = useState({
     title: '',
@@ -44,22 +43,8 @@ const CreateSession = () => {
     fetchCreateData();
   }, []);
 
-  const handleGenerateMeetLink = async () => {
-    setIsGeneratingLink(true)
-    // Simulated Meet link generation (In production, the backend handles this via startSession or similar integration)
-    setTimeout(() => {
-      setGoogleMeetLink(`https://meet.google.com/${Math.random().toString(36).substring(2, 5)}-${Math.random().toString(36).substring(2, 6)}-${Math.random().toString(36).substring(2, 5)}`)
-      setIsGeneratingLink(false)
-    }, 1500)
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!googleMeetLink) {
-      alert('Please generate a Google Meet link first')
-      return
-    }
-
     setIsSubmitting(true);
     try {
       // Build ISO string from local date/time input
@@ -77,11 +62,10 @@ const CreateSession = () => {
         pricingType: formData.pricingType
       });
 
-      // API call success - now we can navigate
-      console.log('Session Created Successfully')
+      // API call success - navigate to sessions list
       navigate('/tutor/sessions')
     } catch (err: any) {
-      alert(err.message || "Failed to create session. Please check your data.");
+      setSubmitError(err.message || "Failed to create session. Please check your data.");
     } finally {
       setIsSubmitting(false);
     }
@@ -93,6 +77,10 @@ const CreateSession = () => {
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Create New Session</h1>
         <p className="text-gray-600">Schedule a new teaching session with Google Meet integration</p>
       </div>
+
+      {submitError && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{submitError}</div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <Card>
@@ -261,50 +249,15 @@ const CreateSession = () => {
             <CardTitle>Google Meet Integration</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {!googleMeetLink ? (
-              <div className="p-6 bg-primary-50 border border-primary-200 rounded-lg">
-                <div className="flex items-center gap-3 mb-4">
-                  <Video className="w-6 h-6 text-primary-600" />
-                  <div>
-                    <h3 className="font-semibold text-gray-900">Generate Google Meet Link</h3>
-                    <p className="text-sm text-gray-600">
-                      A Google Meet link will be created and scheduled for this session
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  type="button"
-                  onClick={handleGenerateMeetLink}
-                  isLoading={isGeneratingLink}
-                >
-                  <LinkIcon className="mr-2 w-5 h-5" />
-                  {isGeneratingLink ? 'Generating...' : 'Generate Google Meet Link'}
-                </Button>
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
+              <Video className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-gray-900 text-sm">Meeting link auto-generated</p>
+                <p className="text-xs text-gray-600 mt-0.5">
+                  A Google Meet link will be automatically created when the session is saved. You can start the meeting directly from your Sessions page when it's time.
+                </p>
               </div>
-            ) : (
-              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Video className="w-5 h-5 text-green-600" />
-                    <div>
-                      <p className="font-semibold text-gray-900">Google Meet Link Generated</p>
-                      <p className="text-sm text-gray-600">{googleMeetLink}</p>
-                    </div>
-                  </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setGoogleMeetLink('')}
-                  >
-                    Regenerate
-                  </Button>
-                </div>
-              </div>
-            )}
-            <p className="text-xs text-gray-500">
-              The link will be shared with students when they book. You can start the meeting from your sessions page.
-            </p>
+            </div>
           </CardContent>
         </Card>
 

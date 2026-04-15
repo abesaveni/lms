@@ -241,18 +241,19 @@ const NotificationsPage = () => {
 
         {/* Search */}
         <div className="relative w-full md:w-80 group">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-primary-500 transition-colors" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-primary-500 transition-colors pointer-events-none" />
           <input
+            id="notif-search"
             type="text"
-            placeholder="Search..."
+            placeholder="Search notifications..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-9 py-2 bg-gray-100/50 border-none rounded-xl focus:ring-2 focus:ring-primary-500/10 focus:bg-white transition-all text-sm h-11"
+            className="w-full pl-10 pr-9 py-2 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-400 transition-all text-sm h-11 shadow-sm"
           />
           {searchQuery && (
-            <button 
+            <button
               onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors focus:outline-none"
             >
               <X className="h-4 w-4" />
             </button>

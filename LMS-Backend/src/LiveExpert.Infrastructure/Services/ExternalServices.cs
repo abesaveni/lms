@@ -328,17 +328,12 @@ public class GoogleCalendarService : IGoogleCalendarService
     {
         // This method should be called with a userId context
         // For now, return a placeholder - actual implementation requires userId
-        _logger.LogInformation("Google Meet link creation requested: {Title} from {Start} to {End}", title, startTime, endTime);
-        
-        // In production, this would:
-        // 1. Get user's access token via ICalendarConnectionService
-        // 2. Create Google Calendar event with conference data
-        // 3. Extract Meet link from conference entry points
-        // 4. Return the encrypted Meet URL
-        
-        var meetingId = Guid.NewGuid().ToString("N").Substring(0, 12);
-        var meetingLink = $"https://meet.google.com/{meetingId}";
-        
+        _logger.LogInformation("Meeting link creation requested: {Title} from {Start} to {End}", title, startTime, endTime);
+
+        // Generate a Jitsi Meet link — no OAuth required, works immediately
+        var roomName = $"liveexpert-{Guid.NewGuid().ToString("N").Substring(0, 10)}";
+        var meetingLink = $"https://meet.jit.si/{roomName}";
+
         await Task.CompletedTask;
         return meetingLink;
     }

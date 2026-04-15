@@ -3,7 +3,6 @@ using LiveExpert.Application.Interfaces;
 using LiveExpert.Domain.Entities;
 using LiveExpert.Domain.Enums;
 using MediatR;
-using Microsoft.EntityFrameworkCore;
 
 namespace LiveExpert.Application.Features.Sessions.Commands;
 
@@ -24,6 +23,7 @@ public class JoinSessionCommandHandler : IRequestHandler<JoinSessionCommand, Res
     private readonly IRepository<User> _userRepository;
     private readonly IRepository<Session> _sessionRepository;
     private readonly IRepository<SessionBooking> _bookingRepository;
+    private readonly IRepository<SessionMeetLink> _meetLinkRepository;
     private readonly ICurrentUserService _currentUserService;
     private readonly IEncryptionService _encryptionService;
     private readonly ICalendarConnectionService _calendarConnectionService;
@@ -33,6 +33,7 @@ public class JoinSessionCommandHandler : IRequestHandler<JoinSessionCommand, Res
         IRepository<User> userRepository,
         IRepository<Session> sessionRepository,
         IRepository<SessionBooking> bookingRepository,
+        IRepository<SessionMeetLink> meetLinkRepository,
         ICurrentUserService currentUserService,
         IEncryptionService encryptionService,
         ICalendarConnectionService calendarConnectionService,
@@ -41,6 +42,7 @@ public class JoinSessionCommandHandler : IRequestHandler<JoinSessionCommand, Res
         _userRepository = userRepository;
         _sessionRepository = sessionRepository;
         _bookingRepository = bookingRepository;
+        _meetLinkRepository = meetLinkRepository;
         _currentUserService = currentUserService;
         _encryptionService = encryptionService;
         _calendarConnectionService = calendarConnectionService;
@@ -93,18 +95,17 @@ public class JoinSessionCommandHandler : IRequestHandler<JoinSessionCommand, Res
                 "Your booking is not confirmed. Please ensure your payment was successful.");
         }
 
-        // Get Meet link from session's navigation property
-        var meetLink = await _sessionRepository.GetQueryable()
-            .Where(s => s.Id == request.SessionId)
-            .Select(s => s.MeetLink)
-            .FirstOrDefaultAsync(cancellationToken);
-            
-        if (meetLink == null || !meetLink.IsActive)
+        // Get Meet link via direct repository query (navigation property projection is unreliable with SQLite)
+        var meetLink = await _meetLinkRepository.FirstOrDefaultAsync(
+            ml => ml.SessionId == request.SessionId && ml.IsActive, cancellationToken);
+
+        if (meetLink == null)
         {
-            return Result<JoinSessionResponse>.FailureResult("NO_MEET_LINK", "Google Meet link not available");
+            return Result<JoinSessionResponse>.FailureResult("NO_MEET_LINK",
+                "The meeting link is not available yet. Please wait for the tutor to start the session.");
         }
 
-        // Decrypt Meet URL (temporary - expires in 5 minutes)
+        // Decrypt Meet URL
         var decryptedUrl = _encryptionService.Decrypt(meetLink.MeetUrl);
 
         // Update booking join time

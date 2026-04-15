@@ -84,18 +84,19 @@ public class SubscriptionController : ControllerBase
         bool trialExpired = false;
         int daysRemaining = 0;
 
-        if (user.TrialStartDate.HasValue)
+        if (!user.TrialStartDate.HasValue)
         {
-            var trialEnd = user.TrialEndDate ?? user.TrialStartDate.Value.AddDays(15);
+            // Start trial now on first status check (same as middleware behaviour)
+            user.TrialStartDate = now;
+            user.TrialEndDate = now.AddDays(15);
+            await _context.SaveChangesAsync();
+        }
+
+        {
+            var trialEnd = user.TrialEndDate ?? user.TrialStartDate!.Value.AddDays(15);
             trialActive = now <= trialEnd;
             trialExpired = now > trialEnd;
-            daysRemaining = trialActive ? (int)(trialEnd - now).TotalDays + 1 : 0;
-        }
-        else
-        {
-            // Trial not yet started — will start on first login
-            trialActive = false;
-            daysRemaining = 15;
+            daysRemaining = trialActive ? Math.Max(1, (int)Math.Ceiling((trialEnd - now).TotalDays)) : 0;
         }
 
         return Ok(new

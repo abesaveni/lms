@@ -15,6 +15,8 @@ import NotificationPreferences from '../../components/settings/NotificationPrefe
 
 const ProfileSettings = () => {
   const [showPassword, setShowPassword] = useState(false)
+  const [profileMessage, setProfileMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [passwordMessage, setPasswordMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -142,6 +144,7 @@ const ProfileSettings = () => {
   }
 
   const handleSaveProfile = async () => {
+    setProfileMessage(null)
     try {
       setIsSaving(true)
       const parts = formData.name.split(' ')
@@ -181,40 +184,70 @@ const ProfileSettings = () => {
       }
 
 
-      alert('Profile updated successfully')
-      
-      // Clear base64 after successful save
-      setFormData(prev => ({
-        ...prev,
-        profilePictureBase64: '',
-        profilePictureFileName: ''
-      }))
-      
+      // Re-fetch fresh profile data from server (gets actual stored image URL)
+      try {
+        const fresh = await getCurrentUserProfile()
+        setProfile(fresh)
+        setFormData(prev => ({
+          ...prev,
+          name: `${fresh.firstName || ''} ${fresh.lastName || ''}`.trim() || fresh.username || '',
+          phone: fresh.phoneNumber || '',
+          bio: fresh.bio || '',
+          dateOfBirth: fresh.dateOfBirth ? fresh.dateOfBirth.split('T')[0] : '',
+          location: fresh.location || '',
+          language: fresh.language || 'English',
+          timezone: fresh.timezone || 'UTC',
+          profilePictureBase64: '',
+          profilePictureFileName: '',
+        }))
+      } catch {
+        // Non-fatal — data was saved, just clear the base64
+        setFormData(prev => ({
+          ...prev,
+          profilePictureBase64: '',
+          profilePictureFileName: ''
+        }))
+      }
+
+      setProfileMessage({ type: 'success', text: 'Profile updated successfully' })
+
     } catch (err: any) {
-      alert(err.message || 'Failed to update profile')
+      setProfileMessage({ type: 'error', text: err.message || 'Failed to update profile' })
     } finally {
       setIsSaving(false)
     }
   }
   
   const handleUpdatePassword = async () => {
+    setPasswordMessage(null)
+
     if (!formData.currentPassword || !formData.newPassword || !formData.confirmPassword) {
-      alert('All password fields are required')
+      setPasswordMessage({ type: 'error', text: 'All password fields are required' })
       return
     }
-    
+
+    if (formData.newPassword.length < 8) {
+      setPasswordMessage({ type: 'error', text: 'New password must be at least 8 characters' })
+      return
+    }
+
+    if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.newPassword)) {
+      setPasswordMessage({ type: 'error', text: 'New password must contain at least one uppercase letter, one lowercase letter, and one number' })
+      return
+    }
+
     if (formData.newPassword !== formData.confirmPassword) {
-      alert('New passwords do not match')
+      setPasswordMessage({ type: 'error', text: 'New passwords do not match' })
       return
     }
-    
+
     try {
       setIsSaving(true)
       await changePassword({
         currentPassword: formData.currentPassword,
         newPassword: formData.newPassword
       })
-      alert('Password updated successfully')
+      setPasswordMessage({ type: 'success', text: 'Password updated successfully! Use your new password on next login.' })
       setFormData(prev => ({
         ...prev,
         currentPassword: '',
@@ -222,7 +255,7 @@ const ProfileSettings = () => {
         confirmPassword: ''
       }))
     } catch (err: any) {
-      alert(err.message || 'Failed to update password')
+      setPasswordMessage({ type: 'error', text: err.message || 'Failed to update password' })
     } finally {
       setIsSaving(false)
     }
@@ -324,6 +357,11 @@ const ProfileSettings = () => {
                   onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
                 />
               </div>
+              {profileMessage && (
+                <div className={`p-3 rounded-lg text-sm font-medium ${profileMessage.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                  {profileMessage.text}
+                </div>
+              )}
               <div className="pt-4 border-t border-gray-200">
                 <Button onClick={handleSaveProfile} disabled={isSaving}>
                   <Save className="mr-2 w-5 h-5" />
@@ -340,12 +378,26 @@ const ProfileSettings = () => {
               <CardTitle>Change Password</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
+              {passwordMessage && (
+                <div className={`px-4 py-3 rounded-lg text-sm font-medium ${passwordMessage.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                  {passwordMessage.text}
+                </div>
+              )}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-700">
+                <p className="font-medium mb-1">Password requirements:</p>
+                <ul className="list-disc list-inside space-y-0.5">
+                  <li>At least 8 characters</li>
+                  <li>At least one uppercase letter (A–Z)</li>
+                  <li>At least one lowercase letter (a–z)</li>
+                  <li>At least one number (0–9)</li>
+                </ul>
+              </div>
               <div className="relative">
                 <Input
                   label="Current Password"
                   type={showPassword ? 'text' : 'password'}
                   value={formData.currentPassword}
-                  onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
+                  onChange={(e) => { setPasswordMessage(null); setFormData({ ...formData, currentPassword: e.target.value }) }}
                   className="pr-10"
                 />
                 <button
@@ -359,13 +411,13 @@ const ProfileSettings = () => {
                 label="New Password"
                 type="password"
                 value={formData.newPassword}
-                onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
+                onChange={(e) => { setPasswordMessage(null); setFormData({ ...formData, newPassword: e.target.value }) }}
               />
               <Input
                 label="Confirm New Password"
                 type="password"
                 value={formData.confirmPassword}
-                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                onChange={(e) => { setPasswordMessage(null); setFormData({ ...formData, confirmPassword: e.target.value }) }}
               />
               <div className="pt-4 border-t border-gray-200">
                 <Button onClick={handleUpdatePassword} disabled={isSaving}>
@@ -373,7 +425,6 @@ const ProfileSettings = () => {
                   {isSaving ? 'Updating...' : 'Update Password'}
                 </Button>
               </div>
-
             </CardContent>
           </Card>
         </TabsContent>
@@ -414,6 +465,11 @@ const ProfileSettings = () => {
                   <option value="Europe/London">Europe/London</option>
                 </select>
               </div>
+              {profileMessage && (
+                <div className={`p-3 rounded-lg text-sm font-medium ${profileMessage.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                  {profileMessage.text}
+                </div>
+              )}
               <div className="pt-4 border-t border-gray-200">
                 <Button onClick={handleSaveProfile} disabled={isSaving}>
                   <Save className="mr-2 w-5 h-5" />

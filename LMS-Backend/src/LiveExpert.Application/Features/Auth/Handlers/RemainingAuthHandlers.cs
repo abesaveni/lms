@@ -211,8 +211,15 @@ public class ForgotPasswordCommandHandler : IRequestHandler<ForgotPasswordComman
 
         var resetLink = $"https://liveexpert.ai/reset-password?token={resetToken}&userId={user.Id}";
 
-        // Send password reset email
-        await _notificationService.SendForgotPasswordEmailAsync(user, resetLink, 60, cancellationToken);
+        // Send password reset email — fire-and-forget, do not fail if email not configured
+        try
+        {
+            await _notificationService.SendForgotPasswordEmailAsync(user, resetLink, 60, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Failed to send forgot-password email: {ex.Message}");
+        }
 
         return Result.SuccessResult("If the email exists, a password reset link has been sent");
     }

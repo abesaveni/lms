@@ -26,6 +26,7 @@ const CourseDetailPage = () => {
   const [loading, setLoading] = useState(true)
   const [enrolling, setEnrolling] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [enrollType, setEnrollType] = useState<'Full' | 'Partial'>('Full')
   const [sessionsToPurchase, setSessionsToPurchase] = useState(5)
   const [syllabusOpen, setSyllabusOpen] = useState(false)
@@ -104,9 +105,11 @@ const CourseDetailPage = () => {
     setEnrolling(true)
     try {
       const res = await bookTrial({ tutorId: course.tutor.tutorId, courseId: id })
-      alert(res.message)
+      setSuccessMessage(res.message || 'Trial booked successfully!')
+      setError(null)
     } catch (err: any) {
       setError(err.message || 'Failed to book trial')
+      setSuccessMessage(null)
     } finally {
       setEnrolling(false)
     }
@@ -132,6 +135,9 @@ const CourseDetailPage = () => {
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>
+      )}
+      {successMessage && (
+        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm font-medium">{successMessage}</div>
       )}
 
       <div className="grid lg:grid-cols-3 gap-8">

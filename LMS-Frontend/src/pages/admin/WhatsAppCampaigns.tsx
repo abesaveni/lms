@@ -54,7 +54,7 @@ const WhatsAppCampaigns = () => {
   const handleCreateCampaign = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!campaignName || !message || (numbers.length === 0 && !selectedFile)) {
-      alert('Please fill all fields and add at least one number')
+      setError('Please fill all fields and add at least one number')
       return
     }
     setError(null)

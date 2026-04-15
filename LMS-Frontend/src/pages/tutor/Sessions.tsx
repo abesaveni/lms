@@ -13,6 +13,7 @@ const TutorSessions = () => {
   const [sessions, setSessions] = useState<SessionDto[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   const fetchSessions = async () => {
     setIsLoading(true);
@@ -28,32 +29,34 @@ const TutorSessions = () => {
   }
 
   const handleStartSession = async (sessionId: string) => {
+    setActionError(null)
     try {
       const { meetUrl } = await startSession(sessionId);
       window.open(meetUrl, '_blank');
       fetchSessions(); // Refresh to update status
     } catch (err: any) {
-      alert(err.message || "Failed to start session");
+      setActionError(err.message || "Failed to start session");
     }
   }
 
   const handleJoinSession = async (sessionId: string) => {
+    setActionError(null)
     try {
       const { meetUrl } = await joinSession(sessionId);
       window.open(meetUrl, '_blank');
     } catch (err: any) {
-      alert(err.message || "Failed to join session. Make sure you have started it first.");
+      setActionError(err.message || "Failed to join session. Make sure you have started it first.");
     }
   }
 
   const handleMarkComplete = async (sessionId: string) => {
     if (!confirm("Are you sure you want to mark this session as completed? This will finalize earnings and notify students.")) return;
-    
+    setActionError(null)
     try {
       await markSessionComplete(sessionId);
       fetchSessions();
     } catch (err: any) {
-      alert(err.message || "Failed to complete session");
+      setActionError(err.message || "Failed to complete session");
     }
   }
 
@@ -83,6 +86,9 @@ const TutorSessions = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {error && <div className="p-4 text-red-500 bg-red-50 rounded-md mb-4">{error}</div>}
+      {actionError && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm mb-4">{actionError}</div>
+      )}
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">My Sessions</h1>
@@ -131,7 +137,7 @@ const TutorSessions = () => {
                           {new Date(session.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {session.duration}m
                         </div>
                         <div className="flex items-center gap-1">
-                          <span className="font-semibold text-primary-600">${session.basePrice}</span>
+                          <span className="font-semibold text-primary-600">₹{session.basePrice}</span>
                         </div>
                       </div>
                     </div>
@@ -188,7 +194,7 @@ const TutorSessions = () => {
                         {new Date(session.scheduledAt).toLocaleDateString()}
                       </div>
                       <div className="flex items-center gap-1">
-                        <span className="font-semibold text-primary-600">${session.basePrice}</span>
+                        <span className="font-semibold text-primary-600">₹{session.basePrice}</span>
                       </div>
                     </div>
                   </div>

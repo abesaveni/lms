@@ -79,7 +79,7 @@ export const TutorCard = ({
         <div className="pt-3 border-t border-gray-50 flex items-center justify-between">
            <div className="flex flex-col">
               <div className="flex items-baseline gap-0.5">
-                 <span className="text-xl font-bold text-gray-900">${price}</span>
+                 <span className="text-xl font-bold text-gray-900">₹{price}</span>
                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-0.5">/hr</span>
               </div>
            </div>

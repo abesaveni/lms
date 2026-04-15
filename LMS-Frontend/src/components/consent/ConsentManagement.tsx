@@ -21,6 +21,7 @@ const ConsentManagement = () => {
   const [isCalendarConnected, setIsCalendarConnected] = useState<boolean | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   useEffect(() => {
     loadConsents()
@@ -117,7 +118,7 @@ const ConsentManagement = () => {
       await revokeUserConsent('GoogleCalendar')
       await loadConsents()
       await checkCalendarStatus()
-      alert('Google Calendar disconnected. You will need to reconnect to use session features.')
+      setSuccessMessage('Google Calendar disconnected successfully.')
     } catch (error: any) {
       setError(error.message || 'Failed to revoke calendar consent')
     } finally {
@@ -133,6 +134,11 @@ const ConsentManagement = () => {
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
           {error}
+        </div>
+      )}
+      {successMessage && (
+        <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+          {successMessage}
         </div>
       )}
 
@@ -288,7 +294,7 @@ const ConsentManagement = () => {
                 <div className="flex items-center gap-2 mb-1">
                   <Calendar className="w-4 h-4 text-primary-600" />
                   <h3 className="font-semibold text-gray-900">Google Calendar</h3>
-                  {calendarConsent?.granted && isCalendarConnected ? (
+                  {isCalendarConnected ? (
                     <Badge variant="success">
                       <CheckCircle className="w-3 h-3 mr-1" />
                       Connected
@@ -323,7 +329,7 @@ const ConsentManagement = () => {
               </ul>
             </div>
             <div className="flex gap-3">
-              {calendarConsent?.granted && isCalendarConnected ? (
+              {isCalendarConnected ? (
                 <Button
                   variant="outline"
                   size="sm"

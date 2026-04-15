@@ -33,7 +33,7 @@ export function createHubConnection(
     .withUrl(url, {
       accessTokenFactory: () => token,
       skipNegotiation: false,
-      transport: signalR.HttpTransportType.WebSockets,
+      transport: signalR.HttpTransportType.WebSockets | signalR.HttpTransportType.LongPolling,
     })
     .build()
 

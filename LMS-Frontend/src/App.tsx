@@ -78,6 +78,7 @@ import BillingHistory from './pages/student/BillingHistory'
 import DailyGames from './pages/student/DailyGames'
 import TutorMyCourses from './pages/tutor/MyCourses'
 import CreateEditCourse from './pages/tutor/CreateEditCourse'
+import CourseEnrollments from './pages/tutor/CourseEnrollments'
 import SubjectRates from './pages/tutor/SubjectRates'
 import AdminAITools from './pages/admin/AITools'
 
@@ -177,6 +178,7 @@ function App() {
           <Route path="/tutor/courses" element={<ProtectedRoute requiredRole="tutor"><DashboardLayout role="tutor"><TutorMyCourses /></DashboardLayout></ProtectedRoute>} />
           <Route path="/tutor/courses/create" element={<ProtectedRoute requiredRole="tutor"><DashboardLayout role="tutor"><CreateEditCourse /></DashboardLayout></ProtectedRoute>} />
           <Route path="/tutor/courses/edit/:id" element={<ProtectedRoute requiredRole="tutor"><DashboardLayout role="tutor"><CreateEditCourse /></DashboardLayout></ProtectedRoute>} />
+          <Route path="/tutor/courses/:courseId/enrollments" element={<ProtectedRoute requiredRole="tutor"><DashboardLayout role="tutor"><CourseEnrollments /></DashboardLayout></ProtectedRoute>} />
           <Route path="/tutor/subject-rates" element={<ProtectedRoute requiredRole="tutor"><DashboardLayout role="tutor"><SubjectRates /></DashboardLayout></ProtectedRoute>} />
 
           {/* Calendar Routes */}

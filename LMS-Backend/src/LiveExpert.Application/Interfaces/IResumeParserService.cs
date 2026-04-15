@@ -53,6 +53,10 @@ public class ResumeParseResult
 
     // Raw data for debugging
     public string RawData { get; set; } = string.Empty;
+
+    // Status flags (set by controller, not parser)
+    public bool NotConfigured { get; set; } = false;
+    public string? ParseError { get; set; }
 }
 
 public class WorkExperienceDto

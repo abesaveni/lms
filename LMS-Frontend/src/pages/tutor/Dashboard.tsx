@@ -10,7 +10,7 @@ import { Avatar } from '../../components/ui/Avatar'
 import { isAdmin, getCurrentUser } from '../../utils/auth'
 import CalendarBlockingScreen from '../../components/calendar/CalendarBlockingScreen'
 
-import { getTutorProfile, TutorProfileDto, getEarningsOverview } from '../../services/tutorApi'
+import { getTutorProfile, TutorProfileDto, getEarningsOverview, getTutorDashboardStats } from '../../services/tutorApi'
 import { getTutorSessions, SessionDto } from '../../services/sessionsApi'
 
 const TutorDashboard = () => {
@@ -18,6 +18,7 @@ const TutorDashboard = () => {
   const [profile, setProfile] = useState<TutorProfileDto | null>(null)
   const [upcomingSessions, setUpcomingSessions] = useState<SessionDto[]>([])
   const [earnings, setEarnings] = useState({ totalEarned: 0, pending: 0, available: 0 })
+  const [totalStudents, setTotalStudents] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [isSessionsLoading, setIsSessionsLoading] = useState(true)
   const [isCalendarConnected, setIsCalendarConnected] = useState<boolean | null>(null)
@@ -34,14 +35,16 @@ const TutorDashboard = () => {
       }
 
       try {
-        const [profileData, earningsData, { checkCalendarConnection: checkConnection }] = await Promise.all([
+        const [profileData, earningsData, dashboardStats, { checkCalendarConnection: checkConnection }] = await Promise.all([
           getTutorProfile(),
           getEarningsOverview(),
+          getTutorDashboardStats(),
           import('../../services/calendarApi')
         ])
 
         setProfile(profileData)
         setEarnings(earningsData)
+        setTotalStudents(dashboardStats.totalStudents ?? 0)
 
         // Check verification status
         if (profileData.verificationStatus !== 'Approved') {
@@ -91,10 +94,7 @@ const TutorDashboard = () => {
     )
   }
 
-  // MANDATORY: Block access if calendar not connected (skip for admins)
-  if (!isAdmin() && isCalendarConnected === false) {
-    return <CalendarBlockingScreen userRole="tutor" />
-  }
+  // Calendar check removed — sessions use Jitsi, no Google Calendar required
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
@@ -126,12 +126,11 @@ const TutorDashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <EnhancedStatsCard
             title="Total Students"
-            value="127"
+            value={totalStudents.toString()}
             icon={<Users className="w-6 h-6" />}
-            trend={{ value: 15, isPositive: true }}
             delay={0.3}
             gradient="primary"
-            description="Active students"
+            description="Unique students booked"
           />
           <EnhancedStatsCard
             title="Upcoming Sessions"
@@ -143,7 +142,7 @@ const TutorDashboard = () => {
           />
           <EnhancedStatsCard
             title="Total Earnings"
-            value={`$${earnings.totalEarned}`}
+            value={`₹${earnings.totalEarned.toLocaleString()}`}
             icon={<DollarSign className="w-6 h-6" />}
             delay={0.5}
             gradient="warning"
@@ -364,7 +363,7 @@ const TutorDashboard = () => {
                 className="p-6 rounded-xl bg-gradient-to-br from-success-50 to-success-100 border border-success-200"
               >
                 <p className="text-sm font-medium text-success-700 mb-1">Total Earned</p>
-                <p className="text-3xl font-bold text-success-900">${earnings.totalEarned}</p>
+                <p className="text-3xl font-bold text-success-900">₹{earnings.totalEarned}</p>
               </motion.div>
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
@@ -373,7 +372,7 @@ const TutorDashboard = () => {
                 className="p-6 rounded-xl bg-gradient-to-br from-primary-50 to-primary-100 border border-primary-200"
               >
                 <p className="text-sm font-medium text-primary-700 mb-1">Available to Withdraw</p>
-                <p className="text-3xl font-bold text-primary-900">${earnings.available}</p>
+                <p className="text-3xl font-bold text-primary-900">₹{earnings.available}</p>
               </motion.div>
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
@@ -382,7 +381,7 @@ const TutorDashboard = () => {
                 className="p-6 rounded-xl bg-gradient-to-br from-warning-50 to-warning-100 border border-warning-200"
               >
                 <p className="text-sm font-medium text-warning-700 mb-1">Pending Clearance</p>
-                <p className="text-3xl font-bold text-warning-900">${earnings.pending}</p>
+                <p className="text-3xl font-bold text-warning-900">₹{earnings.pending}</p>
               </motion.div>
             </div>
           </AnimatedCardContent>

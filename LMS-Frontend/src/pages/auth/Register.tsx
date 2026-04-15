@@ -648,10 +648,10 @@ const Register = () => {
                   </div>
 
                   {devOtp && (
-                    <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-4 text-center">
-                      <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-1">⚠️ Email not working — use this OTP</p>
-                      <p className="font-mono font-bold text-3xl tracking-[0.4em] text-amber-900 select-all">{devOtp}</p>
-                      <p className="text-xs text-amber-600 mt-1">Tap the code to select, then paste it below</p>
+                    <div className="rounded-xl border-2 border-primary-400 bg-primary-50 p-4 text-center">
+                      <p className="text-xs font-semibold text-primary-700 uppercase tracking-wide mb-1">Your verification code</p>
+                      <p className="font-mono font-bold text-3xl tracking-[0.4em] text-primary-900 select-all">{devOtp}</p>
+                      <p className="text-xs text-primary-600 mt-1">Enter this code below (also sent to your email)</p>
                     </div>
                   )}
 
@@ -1162,6 +1162,12 @@ const Register = () => {
                           : 'Your account is ready. Continue to your dashboard.'}
                       </p>
                     </div>
+
+                    {errors.email && (
+                      <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+                        {errors.email}
+                      </div>
+                    )}
 
                     <Button type="submit" fullWidth isLoading={isLoading}>
                       Continue to Dashboard

@@ -141,7 +141,7 @@ const TutorInbox = () => {
       setChatRequests(updated)
       await loadConversations()
     } catch (err: any) {
-      alert(err.message || 'Failed to update request')
+      setError(err.message || 'Failed to update request')
     }
   }
 
@@ -179,8 +179,7 @@ const TutorInbox = () => {
       }
     }
 
-    // Delay connection slightly to avoid immediate retries
-    connectionTimeout = setTimeout(initializeSignalR, 500)
+    connectionTimeout = setTimeout(initializeSignalR, 0)
 
     // Cleanup: disconnect when leaving inbox
     return () => {
@@ -448,29 +447,40 @@ const TutorInbox = () => {
                                 {request.status}
                               </Badge>
                             </div>
-                            <div className="flex flex-wrap gap-2 mt-2">
-                              <button
-                                type="button"
-                                onClick={() => handleRequestAction(request.id, 'Accepted')}
-                                className="text-xs font-medium text-green-700 hover:text-green-800"
-                              >
-                                Accept
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleRequestAction(request.id, 'Hold')}
-                                className="text-xs font-medium text-yellow-700 hover:text-yellow-800"
-                              >
-                                Hold
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleRequestAction(request.id, 'Rejected')}
-                                className="text-xs font-medium text-red-700 hover:text-red-800"
-                              >
-                                Reject
-                              </button>
-                            </div>
+                            {request.status === 'Pending' && (
+                              <div className="flex flex-wrap gap-2 mt-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleRequestAction(request.id, 'Accepted')}
+                                  className="text-xs font-medium text-green-700 hover:text-green-800"
+                                >
+                                  Accept
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRequestAction(request.id, 'Hold')}
+                                  className="text-xs font-medium text-yellow-700 hover:text-yellow-800"
+                                >
+                                  Hold
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRequestAction(request.id, 'Rejected')}
+                                  className="text-xs font-medium text-red-700 hover:text-red-800"
+                                >
+                                  Reject
+                                </button>
+                              </div>
+                            )}
+                            {request.status === 'Accepted' && (
+                              <p className="text-xs text-green-600 mt-1 font-medium">Chat enabled</p>
+                            )}
+                            {request.status === 'Rejected' && (
+                              <p className="text-xs text-red-500 mt-1">Request rejected</p>
+                            )}
+                            {request.status === 'Hold' && (
+                              <p className="text-xs text-yellow-600 mt-1">Request on hold</p>
+                            )}
                           </div>
                         </div>
                       </div>

@@ -61,6 +61,7 @@ export interface UpdateTutorProfileRequest {
   bio?: string
   headline?: string
   hourlyRate?: number
+  hourlyRateGroup?: number
   yearsOfExperience?: number
   education?: string
   certifications?: string
@@ -76,6 +77,7 @@ export interface UpdateTutorProfileRequest {
   language?: string
   timezone?: string
   resumeUrl?: string
+  location?: string
 }
 
 /**
@@ -255,6 +257,23 @@ export const uploadTutorProfileImage = async (file: File): Promise<string> => {
   return response.data
 }
 
+export interface TutorDashboardStats {
+  totalStudents: number
+  completedSessions: number
+  upcomingSessionsCount: number
+  totalEarnings: number
+  availableBalance: number
+  averageRating: number
+}
+
+export const getTutorDashboardStats = async (): Promise<TutorDashboardStats> => {
+  const response = await apiGet<ApiResponse<TutorDashboardStats>>('/tutor/dashboard')
+  if (!response.success || !response.data) {
+    return { totalStudents: 0, completedSessions: 0, upcomingSessionsCount: 0, totalEarnings: 0, availableBalance: 0, averageRating: 0 }
+  }
+  return response.data
+}
+
 export const getTutorProfile = async (): Promise<TutorProfileDto> => {
   const response = await apiGet<ApiResponse<TutorProfileDto>>('/tutor/profile')
   if (!response.success || !response.data) {
@@ -281,6 +300,7 @@ export interface TutorProfileDto {
   bio?: string
   headline?: string
   hourlyRate?: number
+  hourlyRateGroup?: number
   yearsOfExperience?: number
   education?: string
   certifications?: string
@@ -296,4 +316,6 @@ export interface TutorProfileDto {
   profilePictureUrl?: string
   language?: string
   timezone?: string
+  location?: string
+  memberSince?: string
 }

@@ -5,6 +5,7 @@ using LiveExpert.API.Hubs;
 using LiveExpert.API.Services;
 using LiveExpert.API.Controllers;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.HttpOverrides;
 using Serilog;
 using System.Reflection;
 using FluentValidation;
@@ -250,6 +251,12 @@ builder.Services.AddHostedService<EarningsReleaseService>();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline
+
+// Trust X-Forwarded-Proto/Host from nginx so Request.Scheme is https in production
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost
+});
 
 // CORS MUST be first - before any other middleware that might write responses
 // Use explicit policy to support SignalR credentials

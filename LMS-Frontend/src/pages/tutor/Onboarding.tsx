@@ -30,18 +30,41 @@ const TutorOnboarding = () => {
       const { parseResume } = await import('../../services/tutorApi')
       const parsed = await parseResume(file)
 
+      const hasData = parsed.skills?.length || parsed.bio || parsed.headline ||
+        parsed.highestEducation || parsed.educationHistory?.length ||
+        parsed.totalExperience || parsed.yearsOfExperience
+
+      if (parsed.notConfigured) {
+        setError('Resume parsing is not configured yet. Please fill in your profile manually.')
+        setProfileMode('manual')
+        return
+      }
+
+      if (parsed.parseError && !hasData) {
+        setError(`Resume parsing failed: ${parsed.parseError}. Please fill in manually.`)
+        setProfileMode('manual')
+        return
+      }
+
       setFormData(prev => ({
         ...prev,
         skills: parsed.skills?.join(', ') || '',
-        experience: `${parsed.totalExperience || parsed.yearsOfExperience || 0} years of experience. ${parsed.bio || ''}`.trim(),
+        experience: parsed.totalExperience || parsed.yearsOfExperience
+          ? `${parsed.totalExperience || parsed.yearsOfExperience} years of experience`
+          : '',
         education: parsed.highestEducation || parsed.educationHistory?.[0]?.degree || '',
         certifications: parsed.certifications?.join(', ') || '',
         languages: parsed.languages?.join(', ') || '',
         bio: parsed.bio || parsed.headline || '',
       }))
+
+      if (!hasData) {
+        setError('Could not extract data from this resume. Please review and fill in manually.')
+      }
       setProfileMode('review')
     } catch (err: any) {
       setError(err.message || 'Failed to parse resume. Please try again or fill in manually.')
+      setProfileMode('manual')
     } finally {
       setIsUploading(false)
     }

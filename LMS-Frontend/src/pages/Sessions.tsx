@@ -30,10 +30,11 @@ const Sessions = () => {
     setIsLoading(true)
     setError(null)
     try {
-      const response = await getSessions({ page: 1, pageSize: 50, upcoming: true, subject: filters.subject || undefined })
+      const response = await getSessions({ page: 1, pageSize: 50, upcoming: true })
       let list = response.items || []
       if (filters.sessionType === '1-on-1') list = list.filter(s => s.maxStudents === 1)
       else if (filters.sessionType === 'Group') list = list.filter(s => s.maxStudents > 1)
+      if (filters.subject) list = list.filter(s => (s.subject || s.subjectName || '').toLowerCase() === filters.subject.toLowerCase())
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase()
         list = list.filter(s =>
@@ -231,7 +232,7 @@ const Sessions = () => {
                         </div>
 
                         <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                          <span className="text-base font-bold text-gray-900">${price}{session.pricingType === 'Hourly' ? '/hr' : ''}</span>
+                          <span className="text-base font-bold text-gray-900">₹{price}{session.pricingType === 'Hourly' ? '/hr' : ''}</span>
                           <Button
                             size="sm"
                             onClick={() => handleBookSession(session.id)}

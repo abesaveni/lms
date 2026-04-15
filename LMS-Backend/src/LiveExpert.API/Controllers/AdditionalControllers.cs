@@ -457,17 +457,21 @@ public class PlatformStatsController : ControllerBase
 {
     private readonly IRepository<User> _userRepository;
     private readonly IRepository<TutorProfile> _tutorRepository;
+    private readonly IRepository<Session> _sessionRepository;
 
     public PlatformStatsController(
         IRepository<User> userRepository,
-        IRepository<TutorProfile> tutorRepository)
+        IRepository<TutorProfile> tutorRepository,
+        IRepository<Session> sessionRepository)
     {
         _userRepository = userRepository;
         _tutorRepository = tutorRepository;
+        _sessionRepository = sessionRepository;
     }
 
     /// <summary>
-    /// Returns live student + tutor counts for the landing page stats bar
+    /// Returns live student + tutor counts, active session count, and current/next session details
+    /// for the landing page dashboard card — no auth required
     /// </summary>
     [HttpGet("stats")]
     public async Task<IActionResult> GetStats()
@@ -475,10 +479,55 @@ public class PlatformStatsController : ControllerBase
         var studentCount = await _userRepository.CountAsync(u => u.Role == UserRole.Student && u.IsActive);
         var tutorCount   = await _tutorRepository.CountAsync(t => t.VerificationStatus == VerificationStatus.Approved);
 
+        // Count sessions currently live
+        var liveSessionCount = await _sessionRepository.CountAsync(
+            s => s.Status == SessionStatus.Live || s.Status == SessionStatus.InProgress);
+
+        // Count upcoming sessions in the next 24 hours
+        var cutoff = DateTime.UtcNow.AddHours(24);
+        var upcomingSessionCount = await _sessionRepository.CountAsync(
+            s => s.Status == SessionStatus.Scheduled && s.ScheduledAt > DateTime.UtcNow && s.ScheduledAt <= cutoff);
+
+        // Fetch the spotlight session: first live, otherwise soonest upcoming
+        Session? spotlight = null;
+        var liveSessions = await _sessionRepository.FindAsync(
+            s => s.Status == SessionStatus.Live || s.Status == SessionStatus.InProgress);
+        spotlight = liveSessions.OrderBy(s => s.ScheduledAt).FirstOrDefault();
+
+        if (spotlight == null)
+        {
+            var upcoming = await _sessionRepository.FindAsync(
+                s => s.Status == SessionStatus.Scheduled && s.ScheduledAt > DateTime.UtcNow && s.ScheduledAt <= cutoff);
+            spotlight = upcoming.OrderBy(s => s.ScheduledAt).FirstOrDefault();
+        }
+
+        object? spotlightDto = null;
+        if (spotlight != null)
+        {
+            var tutor = await _userRepository.GetByIdAsync(spotlight.TutorId);
+            var tutorName = tutor != null
+                ? $"{tutor.FirstName} {tutor.LastName}".Trim()
+                : "Expert Tutor";
+            if (string.IsNullOrWhiteSpace(tutorName)) tutorName = tutor?.Username ?? "Expert Tutor";
+
+            spotlightDto = new
+            {
+                sessionId   = spotlight.Id,
+                title       = spotlight.Title,
+                tutorName,
+                scheduledAt = spotlight.ScheduledAt,
+                duration    = spotlight.Duration,
+                isLive      = spotlight.Status == SessionStatus.Live || spotlight.Status == SessionStatus.InProgress,
+            };
+        }
+
         return Ok(new
         {
             studentCount,
-            tutorCount
+            tutorCount,
+            liveSessionCount,
+            upcomingSessionCount,
+            spotlightSession = spotlightDto
         });
     }
 }

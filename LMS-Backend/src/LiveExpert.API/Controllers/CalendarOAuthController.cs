@@ -50,8 +50,11 @@ public class CalendarOAuthController : ControllerBase
             return NotFound(Result<string>.FailureResult("NOT_FOUND", "User not found"));
         }
 
-        var frontendRedirectUri = redirectUri ?? $"{Request.Scheme}://{Request.Host}/calendar/connect";
-        var backendCallbackUrl = $"{Request.Scheme}://{Request.Host}/api/calendar/oauth/callback";
+        var scheme = Request.Headers.ContainsKey("X-Forwarded-Proto")
+            ? Request.Headers["X-Forwarded-Proto"].ToString().Split(",")[0].Trim()
+            : Request.Scheme;
+        var frontendRedirectUri = redirectUri ?? $"{scheme}://{Request.Host}/calendar/connect";
+        var backendCallbackUrl = $"{scheme}://{Request.Host}/api/calendar/oauth/callback";
 
         var authUrl = await _calendarConnectionService.GetAuthorizationUrlAsync(
             userId.Value,
@@ -97,7 +100,10 @@ public class CalendarOAuthController : ControllerBase
             }
 
             var frontendRedirectUri = parts[1];
-            var backendCallbackUrl = $"{Request.Scheme}://{Request.Host}/api/calendar/oauth/callback";
+            var callbackScheme = Request.Headers.ContainsKey("X-Forwarded-Proto")
+                ? Request.Headers["X-Forwarded-Proto"].ToString().Split(",")[0].Trim()
+                : Request.Scheme;
+            var backendCallbackUrl = $"{callbackScheme}://{Request.Host}/api/calendar/oauth/callback";
             var success = await _calendarConnectionService.ExchangeCodeForTokensAsync(userId, code, backendCallbackUrl);
 
             if (success)
@@ -243,9 +249,37 @@ public class CalendarOAuthController : ControllerBase
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
-
         db.UserCalendarConnections.Add(newConnection);
+
+        // Also save GoogleCalendar consent so the settings page shows "Connected"
+        var consentRepository = HttpContext.RequestServices.GetRequiredService<IRepository<UserConsent>>();
+        var unitOfWork = HttpContext.RequestServices.GetRequiredService<IUnitOfWork>();
+        var existingConsent = await consentRepository.FirstOrDefaultAsync(
+            c => c.UserId == userId.Value && c.ConsentType == ConsentType.GoogleCalendar);
+        if (existingConsent != null)
+        {
+            existingConsent.Granted = true;
+            existingConsent.GrantedAt = DateTime.UtcNow;
+            existingConsent.RevokedAt = null;
+            await consentRepository.UpdateAsync(existingConsent);
+        }
+        else
+        {
+            var newConsent = new UserConsent
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId.Value,
+                ConsentType = ConsentType.GoogleCalendar,
+                Granted = true,
+                GrantedAt = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            await consentRepository.AddAsync(newConsent);
+        }
+
         await db.SaveChangesAsync();
+        await unitOfWork.SaveChangesAsync();
 
         return Ok(Result<bool>.SuccessResult(true));
     }

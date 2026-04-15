@@ -124,19 +124,23 @@ public class TutorProfileController : ControllerBase
 
             return Ok(Result<ResumeParseResult>.SuccessResult(parseResult));
         }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("not configured"))
+        {
+            // Affinda API key not set up by admin — return empty result so tutor can fill manually
+            _logger.LogWarning("Affinda not configured, returning empty parse result for manual fill");
+            return Ok(Result<ResumeParseResult>.SuccessResult(new ResumeParseResult { NotConfigured = true }));
+        }
         catch (AffindaApiException ex)
         {
             _logger.LogError(ex, "Affinda resume parsing error");
-            return StatusCode((int)ex.StatusCode, Result<ResumeParseResult>.FailureResult(
-                ex.Code ?? "AFFINDA_ERROR",
-                ex.Detail ?? "Resume parsing failed with Affinda."));
+            // Return empty result instead of error so the form stays usable
+            return Ok(Result<ResumeParseResult>.SuccessResult(new ResumeParseResult { ParseError = ex.Detail ?? "Resume parsing failed." }));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error parsing resume");
-            return StatusCode(500, Result<ResumeParseResult>.FailureResult(
-                "PARSING_ERROR", 
-                "An error occurred while parsing the resume. Please try again."));
+            // Return empty result instead of 500 so tutor can still fill in manually
+            return Ok(Result<ResumeParseResult>.SuccessResult(new ResumeParseResult { ParseError = "Could not extract data from resume." }));
         }
     }
 
@@ -175,6 +179,7 @@ public class TutorProfileController : ControllerBase
             Bio = tutor.Bio,
             Headline = tutor.Headline,
             HourlyRate = tutor.HourlyRate,
+            HourlyRateGroup = tutor.HourlyRateGroup,
             YearsOfExperience = tutor.YearsOfExperience,
             Education = tutor.Education,
             Certifications = tutor.Certifications,
@@ -189,7 +194,9 @@ public class TutorProfileController : ControllerBase
             VerificationStatus = tutor.VerificationStatus.ToString(),
             ProfilePictureUrl = user?.ProfileImageUrl,
             Language = user?.Language,
-            Timezone = user?.Timezone
+            Timezone = user?.Timezone,
+            Location = user?.Location,
+            MemberSince = user?.CreatedAt
         };
 
         return Ok(Result<TutorProfileDto>.SuccessResult(profile));
@@ -275,7 +282,8 @@ public class TutorProfileController : ControllerBase
 
             user.Language = request.Language ?? user.Language;
             user.Timezone = request.Timezone ?? user.Timezone;
-            
+            user.Location = request.Location ?? user.Location;
+
             await _userRepository.UpdateAsync(user, cancellationToken);
         }
 
@@ -283,6 +291,7 @@ public class TutorProfileController : ControllerBase
         tutor.Bio = request.Bio ?? tutor.Bio;
         tutor.Headline = request.Headline ?? tutor.Headline;
         tutor.HourlyRate = request.HourlyRate ?? tutor.HourlyRate;
+        tutor.HourlyRateGroup = request.HourlyRateGroup ?? tutor.HourlyRateGroup;
         tutor.YearsOfExperience = request.YearsOfExperience ?? tutor.YearsOfExperience;
         tutor.Education = request.Education ?? tutor.Education;
         tutor.Certifications = request.Certifications ?? tutor.Certifications;
@@ -397,26 +406,23 @@ public class TutorProfileController : ControllerBase
             await _verificationRepository.AddAsync(verification, cancellationToken);
         }
 
-        verification.Status = VerificationStatus.Approved;
-        verification.VerifiedAt = DateTime.UtcNow;
+        verification.Status = VerificationStatus.Pending;
         verification.GovtIdUrl = request.GovtIdUrl ?? verification.GovtIdUrl;
         verification.UpdatedAt = DateTime.UtcNow;
 
-        tutor.VerificationStatus = VerificationStatus.Approved;
-        tutor.OnboardingStep = 6; // Move to final step
-        tutor.IsProfileComplete = true;
-        tutor.IsVisible = true; // Make them visible since approved
+        tutor.VerificationStatus = VerificationStatus.Pending;
+        tutor.OnboardingStep = 5; // Submitted, awaiting admin review
+        tutor.IsVisible = false; // Not visible until admin approves
         tutor.UpdatedAt = DateTime.UtcNow;
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        // Send notification to tutor — fire-and-forget, do not fail if email/WhatsApp not configured
+        // Notify admin of new submission — fire-and-forget, do not fail if email/WhatsApp not configured
         try
         {
             var user = await _userRepository.GetByIdAsync(userId.Value, cancellationToken);
             if (user != null)
             {
-                await _notificationService.SendTutorVerifiedAsync(user, cancellationToken);
                 await _notificationService.SendTutorSubmissionToAdminAsync(user, cancellationToken);
             }
         }
@@ -438,6 +444,7 @@ public class UpdateTutorProfileRequest
     public string? Bio { get; set; }
     public string? Headline { get; set; }
     public decimal? HourlyRate { get; set; }
+    public decimal? HourlyRateGroup { get; set; }
     public int? YearsOfExperience { get; set; }
     public string? Education { get; set; }
     public string? Certifications { get; set; }
@@ -453,6 +460,7 @@ public class UpdateTutorProfileRequest
     public string? Language { get; set; }
     public string? Timezone { get; set; }
     public string? ResumeUrl { get; set; }
+    public string? Location { get; set; }
 }
 
 public class TutorProfileDto
@@ -466,6 +474,7 @@ public class TutorProfileDto
     public string? Bio { get; set; }
     public string? Headline { get; set; }
     public decimal HourlyRate { get; set; }
+    public decimal HourlyRateGroup { get; set; }
     public int YearsOfExperience { get; set; }
     public string? Education { get; set; }
     public string? Certifications { get; set; }
@@ -481,6 +490,8 @@ public class TutorProfileDto
     public string? ProfilePictureUrl { get; set; }
     public string? Language { get; set; }
     public string? Timezone { get; set; }
+    public string? Location { get; set; }
+    public DateTime? MemberSince { get; set; }
 }
 
 public class UploadTutorImageRequest

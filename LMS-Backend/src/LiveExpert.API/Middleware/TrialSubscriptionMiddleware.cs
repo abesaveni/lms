@@ -93,6 +93,12 @@ public class TrialSubscriptionMiddleware
             await db.SaveChangesAsync();
             _logger.LogInformation("Trial started for student {UserId}, ends {End}", userId, user.TrialEndDate);
         }
+        else if (!user.TrialEndDate.HasValue)
+        {
+            // TrialStartDate exists but TrialEndDate is missing — fix it
+            user.TrialEndDate = user.TrialStartDate.Value.AddDays(15);
+            await db.SaveChangesAsync();
+        }
 
         // Check if currently subscribed
         var isSubscribed = user.IsSubscribed

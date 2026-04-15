@@ -9,20 +9,75 @@ import {
 } from 'lucide-react'
 import { getPlatformStats } from '../services/tutorsApi'
 
+interface SpotlightSession {
+  sessionId: string
+  title: string
+  tutorName: string
+  scheduledAt: string
+  duration: number
+  isLive: boolean
+}
+
 const Landing = () => {
   const navigate = useNavigate()
   const [studentCount, setStudentCount] = useState<number | null>(null)
   const [tutorCount, setTutorCount] = useState<number | null>(null)
+  const [liveSessionCount, setLiveSessionCount] = useState<number>(0)
+  const [spotlight, setSpotlight] = useState<SpotlightSession | null>(null)
+  const [timerLabel, setTimerLabel] = useState<string>('--:--')
   const [faqOpen, setFaqOpen] = useState<number | null>(null)
 
   useEffect(() => {
     getPlatformStats()
-      .then(stats => {
-        setStudentCount(stats.studentCount)
-        setTutorCount(stats.tutorCount)
+      .then((stats: any) => {
+        setStudentCount(stats.studentCount ?? null)
+        setTutorCount(stats.tutorCount ?? null)
+        setLiveSessionCount(stats.liveSessionCount ?? 0)
+        if (stats.spotlightSession) setSpotlight(stats.spotlightSession)
       })
       .catch(() => {})
   }, [])
+
+  // Real countdown / elapsed timer driven by spotlight session data
+  useEffect(() => {
+    if (!spotlight) return
+
+    const tick = () => {
+      const now = Date.now()
+      const start = new Date(spotlight.scheduledAt).getTime()
+      const end = start + spotlight.duration * 60_000
+
+      let diff: number
+      let label: string
+
+      if (spotlight.isLive) {
+        // Show time remaining in the session
+        diff = Math.max(0, end - now)
+        const m = Math.floor(diff / 60_000)
+        const s = Math.floor((diff % 60_000) / 1000)
+        label = diff === 0 ? 'Ended' : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+      } else {
+        // Show countdown to session start
+        diff = Math.max(0, start - now)
+        if (diff === 0) {
+          label = 'Starting'
+        } else if (diff > 3_600_000) {
+          const h = Math.floor(diff / 3_600_000)
+          const m = Math.floor((diff % 3_600_000) / 60_000)
+          label = `${h}h ${String(m).padStart(2, '0')}m`
+        } else {
+          const m = Math.floor(diff / 60_000)
+          const s = Math.floor((diff % 60_000) / 1000)
+          label = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+        }
+      }
+      setTimerLabel(label)
+    }
+
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [spotlight])
 
   const handleFindTutors = () => {
     const user = getCurrentUser()
@@ -117,7 +172,7 @@ const Landing = () => {
               </div>
             </motion.div>
 
-            {/* Right — Dashboard card */}
+            {/* Right — Live Dashboard card */}
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, delay: 0.15 }} className="relative">
               <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(20px)' }}>
 
@@ -125,58 +180,69 @@ const Landing = () => {
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <p className="text-xs font-semibold mb-0.5" style={{ color: 'rgba(255,255,255,0.35)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Live Dashboard</p>
-                    <p className="text-sm font-semibold text-white">Your Learning Hub</p>
+                    <p className="text-sm font-semibold text-white">Platform Activity</p>
                   </div>
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)', color: '#34d399' }}>
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
-                    Session Live
-                  </div>
+                  {liveSessionCount > 0 ? (
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)', color: '#34d399' }}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
+                      {liveSessionCount} Live
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.45)' }}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-gray-400 inline-block" />
+                      No active sessions
+                    </div>
+                  )}
                 </div>
 
-                {/* Active session */}
-                <div className="rounded-xl p-4 mb-3" style={{ background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.18)' }}>
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(124,58,237,0.2)' }}>
-                      <BookOpen className="w-4 h-4" style={{ color: '#a78bfa' }} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-white truncate">Advanced Web Development</p>
-                      <p className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>with Dr. Sarah K.</p>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>Ends in</p>
-                      <p className="text-sm font-bold" style={{ color: '#a78bfa' }}>32:15</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> 60 min</span>
-                    <span className="flex items-center gap-1"><Star className="w-3 h-3 fill-yellow-400 text-yellow-400" /> 4.9</span>
-                    <span className="flex items-center gap-1 ml-auto" style={{ color: '#34d399' }}><CheckCircle className="w-3 h-3" /> Verified</span>
-                  </div>
-                </div>
-
-                {/* Progress */}
-                <div className="rounded-xl p-4 mb-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-xs font-semibold" style={{ color: 'rgba(255,255,255,0.5)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Weekly Progress</p>
-                    <span className="text-xs font-medium" style={{ color: '#a78bfa' }}>+12% this week</span>
-                  </div>
-                  <div className="space-y-2.5">
-                    {[
-                      { label: 'Web Development', pct: 72, color: '#7c3aed' },
-                      { label: 'Data Science', pct: 55, color: '#0891b2' },
-                      { label: 'English Literature', pct: 38, color: '#d97706' },
-                    ].map(item => (
-                      <div key={item.label}>
-                        <div className="flex justify-between text-xs mb-1">
-                          <span style={{ color: 'rgba(255,255,255,0.65)' }}>{item.label}</span>
-                          <span className="font-semibold text-white">{item.pct}%</span>
-                        </div>
-                        <div className="h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                          <div className="h-full rounded-full transition-all" style={{ width: `${item.pct}%`, background: item.color }} />
-                        </div>
+                {/* Spotlight session — live or upcoming */}
+                {spotlight ? (
+                  <div className="rounded-xl p-4 mb-3" style={{ background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.18)' }}>
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(124,58,237,0.2)' }}>
+                        <BookOpen className="w-4 h-4" style={{ color: '#a78bfa' }} />
                       </div>
-                    ))}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-white truncate">{spotlight.title}</p>
+                        <p className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>with {spotlight.tutorName}</p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                          {spotlight.isLive ? 'Ends in' : 'Starts in'}
+                        </p>
+                        <p className="text-sm font-bold tabular-nums" style={{ color: '#a78bfa' }}>{timerLabel}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                      <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {spotlight.duration} min</span>
+                      {spotlight.isLive && (
+                        <span className="flex items-center gap-1 ml-auto" style={{ color: '#34d399' }}><CheckCircle className="w-3 h-3" /> In Progress</span>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl p-4 mb-3 text-center" style={{ background: 'rgba(124,58,237,0.06)', border: '1px solid rgba(124,58,237,0.12)' }}>
+                    <BookOpen className="w-6 h-6 mx-auto mb-2" style={{ color: 'rgba(167,139,250,0.4)' }} />
+                    <p className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>No sessions scheduled in the next 24 hours</p>
+                  </div>
+                )}
+
+                {/* Platform live stats */}
+                <div className="rounded-xl p-4 mb-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <p className="text-xs font-semibold mb-3" style={{ color: 'rgba(255,255,255,0.5)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Platform Stats</p>
+                  <div className="grid grid-cols-3 gap-3 text-center">
+                    <div>
+                      <p className="text-lg font-black text-white">{tutorCount ?? '—'}</p>
+                      <p className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>Tutors</p>
+                    </div>
+                    <div>
+                      <p className="text-lg font-black text-white">{studentCount ?? '—'}</p>
+                      <p className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>Students</p>
+                    </div>
+                    <div>
+                      <p className="text-lg font-black" style={{ color: liveSessionCount > 0 ? '#34d399' : '#fff' }}>{liveSessionCount}</p>
+                      <p className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>Live Now</p>
+                    </div>
                   </div>
                 </div>
 
@@ -187,7 +253,11 @@ const Landing = () => {
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-white mb-0.5">AI Insight</p>
-                    <p className="text-xs" style={{ color: 'rgba(255,255,255,0.45)' }}>You learn best in 45-min focused sessions</p>
+                    <p className="text-xs" style={{ color: 'rgba(255,255,255,0.45)' }}>
+                      {liveSessionCount > 0
+                        ? `${liveSessionCount} session${liveSessionCount > 1 ? 's' : ''} happening right now`
+                        : 'AI-matched tutors available to book instantly'}
+                    </p>
                   </div>
                 </div>
               </div>

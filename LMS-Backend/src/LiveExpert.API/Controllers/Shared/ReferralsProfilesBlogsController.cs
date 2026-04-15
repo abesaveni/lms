@@ -152,11 +152,14 @@ public class ProfilesController : ControllerBase
             Bio = tutor.Bio,
             Headline = tutor.Headline,
             HourlyRate = tutor.HourlyRate,
+            HourlyRateGroup = tutor.HourlyRateGroup,
             YearsOfExperience = tutor.YearsOfExperience,
             AverageRating = tutor.AverageRating,
             TotalReviews = tutor.TotalReviews,
             TotalSessions = tutor.TotalSessions,
             VerificationStatus = tutor.VerificationStatus.ToString(),
+            ProfileImage = user?.ProfileImageUrl,
+            Location = user?.Location,
             FollowerCount = user != null ? await _followerRepository.CountAsync(f => f.TutorId == user.Id, cancellationToken) : 0
         };
         

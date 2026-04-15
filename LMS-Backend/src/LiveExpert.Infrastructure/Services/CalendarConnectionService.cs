@@ -181,9 +181,10 @@ public class CalendarConnectionService : ICalendarConnectionService
 
     public async Task<bool> IsCalendarConnectedAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        var connection = await _context.UserCalendarConnections
-            .FirstOrDefaultAsync(c => c.UserId == userId && c.IsActive, cancellationToken);
-        return connection != null;
+        // Google Calendar is no longer required — sessions use Jitsi for video conferencing.
+        // Return true so the frontend blocking screen is never shown.
+        await Task.CompletedTask;
+        return true;
     }
 
     public async Task<bool> RevokeConnectionAsync(Guid userId, CancellationToken cancellationToken = default)
