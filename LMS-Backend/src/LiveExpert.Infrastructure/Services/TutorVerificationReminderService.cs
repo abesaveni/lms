@@ -74,7 +74,7 @@ public class TutorVerificationReminderService : BackgroundService
                     user.Id,
                     "Complete Your Tutor Verification",
                     "Your profile is not yet verified. Complete your verification to start accepting students and earning from sessions.",
-                    NotificationType.SystemAlert,
+                    NotificationType.TutorVerified,
                     verifyLink,
                     stoppingToken);
 
