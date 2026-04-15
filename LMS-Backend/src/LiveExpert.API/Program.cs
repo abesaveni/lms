@@ -275,7 +275,7 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 // Hangfire dashboard — protected by basic auth using credentials from appsettings/env
-static string? Cfg(string? v) => string.IsNullOrWhiteSpace(v) ? null : v;
+static string? Cfg(string? v) => string.IsNullOrWhiteSpace(v) ? null : v.Trim();
 var hangfirePath     = Cfg(app.Configuration["Hangfire:DashboardPath"]) ?? "/hangfire";
 var hangfireUser     = Cfg(app.Configuration["Hangfire:Username"])      ?? "admin";
 var hangfirePassword = Cfg(app.Configuration["Hangfire:Password"])      ?? "admin";
