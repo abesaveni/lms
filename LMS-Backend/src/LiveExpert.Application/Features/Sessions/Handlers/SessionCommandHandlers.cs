@@ -148,6 +148,7 @@ public class CreateSessionCommandHandler : IRequestHandler<CreateSessionCommand,
             Status = SessionStatus.Scheduled,
             GoogleCalendarEventId = calendarEventId,
             IsRecorded = false,
+            RequiresSubscription = request.RequiresSubscription,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -218,6 +219,7 @@ public class CreateSessionCommandHandler : IRequestHandler<CreateSessionCommand,
             Status = session.Status.ToString(),
             MeetingLink = session.MeetingLink,
             IsBooked = false,
+            RequiresSubscription = session.RequiresSubscription,
             CreatedAt = session.CreatedAt
         });
     }
@@ -271,6 +273,7 @@ public class UpdateSessionCommandHandler : IRequestHandler<UpdateSessionCommand,
         session.Duration = request.Duration;
         session.BasePrice = request.BasePrice;
         session.PricingType = request.PricingType;
+        session.RequiresSubscription = request.RequiresSubscription;
         session.UpdatedAt = DateTime.UtcNow;
 
         await _sessionRepository.UpdateAsync(session, cancellationToken);
@@ -298,6 +301,7 @@ public class UpdateSessionCommandHandler : IRequestHandler<UpdateSessionCommand,
             Status = session.Status.ToString(),
             MeetingLink = session.MeetingLink,
             IsBooked = false,
+            RequiresSubscription = session.RequiresSubscription,
             CreatedAt = session.CreatedAt
         });
     }
@@ -396,6 +400,8 @@ public class CompleteSessionCommandHandler : IRequestHandler<CompleteSessionComm
     private readonly IRepository<SessionBooking> _bookingRepository;
     private readonly IRepository<TutorEarning> _tutorEarningRepository;
     private readonly IRepository<User> _userRepository;
+    private readonly IRepository<ReferralProgram> _referralRepository;
+    private readonly IRepository<BonusPoint> _bonusPointRepository;
     private readonly ICurrentUserService _currentUserService;
     private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
@@ -405,6 +411,8 @@ public class CompleteSessionCommandHandler : IRequestHandler<CompleteSessionComm
         IRepository<SessionBooking> bookingRepository,
         IRepository<TutorEarning> tutorEarningRepository,
         IRepository<User> userRepository,
+        IRepository<ReferralProgram> referralRepository,
+        IRepository<BonusPoint> bonusPointRepository,
         ICurrentUserService currentUserService,
         INotificationService notificationService,
         IUnitOfWork unitOfWork)
@@ -413,6 +421,8 @@ public class CompleteSessionCommandHandler : IRequestHandler<CompleteSessionComm
         _bookingRepository = bookingRepository;
         _tutorEarningRepository = tutorEarningRepository;
         _userRepository = userRepository;
+        _referralRepository = referralRepository;
+        _bonusPointRepository = bonusPointRepository;
         _currentUserService = currentUserService;
         _notificationService = notificationService;
         _unitOfWork = unitOfWork;
@@ -494,6 +504,56 @@ public class CompleteSessionCommandHandler : IRequestHandler<CompleteSessionComm
 
             // Earnings remain Pending — EarningsReleaseService releases them after the 3-day hold
             // set at payment verification time. Do NOT override AvailableAt here.
+
+            // ── Feature 18: Tutor referral milestone ────────────────────────
+            // After the tutor completes their 5th session, unlock the referring tutor's 100-pt bonus
+            var tutorCompletedSessions = await _sessionRepository.FindAsync(
+                s => s.TutorId == userId.Value && s.Status == SessionStatus.Completed,
+                cancellationToken);
+            if (tutorCompletedSessions.Count() == 5) // exactly 5 — fires once at the milestone
+            {
+                var tutorReferral = await _referralRepository.FirstOrDefaultAsync(
+                    r => r.ReferredUserId == userId.Value
+                        && r.IsTutorReferral
+                        && r.Status == "Pending"
+                        && r.ReferralBonusPaidAt == null,
+                    cancellationToken);
+
+                if (tutorReferral != null)
+                {
+                    var isExpired = tutorReferral.ExpiresAt.HasValue && tutorReferral.ExpiresAt.Value < DateTime.UtcNow;
+                    if (!isExpired)
+                    {
+                        await _bonusPointRepository.AddAsync(new BonusPoint
+                        {
+                            Id = Guid.NewGuid(),
+                            UserId = tutorReferral.ReferrerId,
+                            Points = (int)tutorReferral.RewardCredits,
+                            Reason = BonusPointReason.Referral,
+                            ReferenceId = userId.Value,
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        }, cancellationToken);
+
+                        tutorReferral.Status = "Completed";
+                        tutorReferral.ReferralBonusPaidAt = DateTime.UtcNow;
+                        tutorReferral.RewardedAt = DateTime.UtcNow;
+                        await _referralRepository.UpdateAsync(tutorReferral, cancellationToken);
+
+                        try
+                        {
+                            await _notificationService.SendNotificationAsync(
+                                tutorReferral.ReferrerId,
+                                "Tutor Referral Bonus Unlocked!",
+                                $"The tutor you referred has completed their 5th session. You earned {(int)tutorReferral.RewardCredits} bonus points!",
+                                NotificationType.ReferralBonus,
+                                null,
+                                cancellationToken);
+                        }
+                        catch { /* do not block */ }
+                    }
+                }
+            }
 
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
 

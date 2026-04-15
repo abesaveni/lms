@@ -39,6 +39,9 @@ public class Session : BaseEntity
     public DateTime? CompletedAt { get; set; }
     public bool IsReminderSent { get; set; }
 
+    /// <summary>When true, only students with an active subscription can book this session.</summary>
+    public bool RequiresSubscription { get; set; } = false;
+
     // Navigation Properties
     public User Tutor { get; set; } = null!;
     public Subject Subject { get; set; } = null!;

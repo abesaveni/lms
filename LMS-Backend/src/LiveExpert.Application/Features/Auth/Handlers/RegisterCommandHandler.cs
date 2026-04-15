@@ -54,6 +54,21 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, Result<Re
     }
 
     /// <summary>
+    /// Tiered referral bonus: 1st referral = 25 pts, 5th = 50 pts, 10th = 100 pts, otherwise 25 pts base.
+    /// Called at first-payment time (not registration) — see PaymentsController.
+    /// </summary>
+    public static int CalculateTieredReferralBonus(int completedReferralCount)
+    {
+        return completedReferralCount switch
+        {
+            0 => 25,   // 1st referral
+            4 => 50,   // 5th referral milestone
+            9 => 100,  // 10th referral milestone
+            _ => 25    // standard reward
+        };
+    }
+
+    /// <summary>
     /// Validates the stateless HMAC-signed signup verification token.
     /// Token format: {base64(email)}:{expiry_unix}:{hmac_hex}
     /// </summary>
@@ -151,10 +166,17 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, Result<Re
                     Id = Guid.NewGuid(),
                     UserId = user.Id,
                     VerificationStatus = VerificationStatus.NotStarted,
+                    TutorReferralCode = GenerateTutorReferralCode(user.Username),
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
                 };
                 await _tutorRepository.AddAsync(tutorProfile, cancellationToken);
+
+                // Handle tutor referral code if provided at registration
+                if (!string.IsNullOrWhiteSpace(request.ReferralCode))
+                {
+                    await HandleTutorReferralCodeAsync(request.ReferralCode, user.Id, cancellationToken);
+                }
             }
             else if (request.Role == UserRole.Student)
             {
@@ -224,33 +246,36 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, Result<Re
         return $"{prefix}{unique}";
     }
 
+    private string GenerateTutorReferralCode(string username)
+    {
+        var prefix = username.ToUpper().Substring(0, Math.Min(3, username.Length));
+        var unique = Guid.NewGuid().ToString("N").Substring(0, 6).ToUpper();
+        return $"T{prefix}{unique}"; // T-prefix distinguishes tutor referral codes
+    }
+
+    /// <summary>
+    /// Feature 16+17+20: Student referral handling.
+    /// Referrer bonus is DEFERRED — awarded only after referred student makes first payment
+    /// (see PaymentsController.VerifySessionPayment).
+    /// Referred student still gets 25 joining bonus pts immediately.
+    /// Bonus expires if first payment not made within 30 days (Feature 17).
+    /// </summary>
     private async Task HandleReferralCodeAsync(string referralCode, Guid newUserId, CancellationToken cancellationToken)
     {
         try
         {
             var normalizedCode = referralCode.Trim().ToUpper();
-            // Find referrer by referral code
             var referrerProfile = await _studentProfileRepository.FirstOrDefaultAsync(
                 sp => sp.ReferralCode == normalizedCode, cancellationToken);
 
-            if (referrerProfile == null)
-            {
-                // Invalid referral code - silently ignore (don't fail registration)
-                return;
-            }
+            if (referrerProfile == null) return;
 
             var referrerId = referrerProfile.UserId;
-
-            // Don't allow self-referral
-            if (referrerId == newUserId)
-            {
-                return;
-            }
-
-            // Award 50 points immediately when referred user registers
-            const decimal referralBonus = 50m;
+            if (referrerId == newUserId) return;
 
             const decimal joiningBonus = 25m;
+            // Referrer reward is calculated at first-payment time (tiered: 25/50/100 pts)
+            const decimal referralBonusPlaceholder = 25m;
 
             var referralProgram = new ReferralProgram
             {
@@ -258,31 +283,20 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, Result<Re
                 ReferrerId = referrerId,
                 ReferredUserId = newUserId,
                 ReferralCode = normalizedCode,
-                Status = "Completed",
-                RewardCredits = referralBonus,
+                Status = "Pending",          // Stays Pending until first payment
+                RewardCredits = referralBonusPlaceholder,
                 JoiningBonusAmount = joiningBonus,
-                ReferralBonusPaidAt = DateTime.UtcNow,
-                RewardedAt = DateTime.UtcNow,
+                ReferralBonusPaidAt = null,  // Set at first-payment time
+                RewardedAt = null,
+                ExpiresAt = DateTime.UtcNow.AddDays(30), // Feature 17: 30-day window
+                IsTutorReferral = false,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
 
             await _referralRepository.AddAsync(referralProgram, cancellationToken);
 
-            // Credit 50 points to the referrer's wallet immediately
-            var bonusPoint = new BonusPoint
-            {
-                Id = Guid.NewGuid(),
-                UserId = referrerId,
-                Points = 50,
-                Reason = BonusPointReason.Referral,
-                ReferenceId = newUserId,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            };
-            await _bonusPointRepository.AddAsync(bonusPoint, cancellationToken);
-
-            // Credit 25 joining bonus points to the newly referred student
+            // Credit 25 joining bonus to the newly referred student immediately
             var joiningBonusPoint = new BonusPoint
             {
                 Id = Guid.NewGuid(),
@@ -295,13 +309,13 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, Result<Re
             };
             await _bonusPointRepository.AddAsync(joiningBonusPoint, cancellationToken);
 
-            // Notify the referrer
+            // Notify referrer that someone registered (but bonus is pending their first payment)
             try
             {
                 await _notificationService.SendNotificationAsync(
                     referrerId,
-                    "Referral Bonus Earned! 🎉",
-                    "You earned 50 points because someone signed up using your referral code.",
+                    "Referral Pending",
+                    "Someone just registered using your referral code. You will earn bonus points when they make their first payment.",
                     NotificationType.ReferralBonus,
                     null,
                     cancellationToken);
@@ -313,4 +327,47 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, Result<Re
             // Silently ignore referral errors - don't fail registration
         }
     }
+
+    /// <summary>
+    /// Feature 18: Tutor-to-tutor referral.
+    /// When a new tutor registers with another tutor's TutorReferralCode, create a pending
+    /// ReferralProgram (IsTutorReferral=true). Reward is credited when the referred tutor
+    /// completes their first 5 sessions (handled in SessionCommandHandlers).
+    /// </summary>
+    private async Task HandleTutorReferralCodeAsync(string referralCode, Guid newTutorUserId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var normalizedCode = referralCode.Trim().ToUpper();
+            var referrerTutor = await _tutorRepository.FirstOrDefaultAsync(
+                t => t.TutorReferralCode == normalizedCode, cancellationToken);
+
+            if (referrerTutor == null) return;
+            if (referrerTutor.UserId == newTutorUserId) return;
+
+            var referralProgram = new ReferralProgram
+            {
+                Id = Guid.NewGuid(),
+                ReferrerId = referrerTutor.UserId,
+                ReferredUserId = newTutorUserId,
+                ReferralCode = normalizedCode,
+                Status = "Pending",
+                RewardCredits = 100m, // 100 pts awarded after referred tutor completes 5 sessions
+                JoiningBonusAmount = 0m,
+                ReferralBonusPaidAt = null,
+                RewardedAt = null,
+                ExpiresAt = DateTime.UtcNow.AddDays(90), // 90 days for tutor referrals
+                IsTutorReferral = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            await _referralRepository.AddAsync(referralProgram, cancellationToken);
+        }
+        catch
+        {
+            // Silently ignore - don't fail registration
+        }
+    }
 }
+

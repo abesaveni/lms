@@ -18,6 +18,7 @@ public class BookSessionCommandHandler : IRequestHandler<BookSessionCommand, Res
     private readonly IRepository<Payment> _paymentRepository;
     private readonly IRepository<BonusPoint> _bonusPointRepository;
     private readonly IRepository<User> _userRepository;
+    private readonly IRepository<StudentSubscription> _subscriptionRepository;
     private readonly ICurrentUserService _currentUserService;
     private readonly INotificationService _notificationHelper;
     private readonly IEmailService _emailService;
@@ -37,6 +38,7 @@ public class BookSessionCommandHandler : IRequestHandler<BookSessionCommand, Res
         IRepository<Payment> paymentRepository,
         IRepository<BonusPoint> bonusPointRepository,
         IRepository<User> userRepository,
+        IRepository<StudentSubscription> subscriptionRepository,
         ICurrentUserService currentUserService,
         INotificationService notificationService,
         IEmailService emailService,
@@ -55,6 +57,7 @@ public class BookSessionCommandHandler : IRequestHandler<BookSessionCommand, Res
         _paymentRepository = paymentRepository;
         _bonusPointRepository = bonusPointRepository;
         _userRepository = userRepository;
+        _subscriptionRepository = subscriptionRepository;
         _currentUserService = currentUserService;
         _notificationHelper = notificationService;
         _emailService = emailService;
@@ -84,6 +87,18 @@ public class BookSessionCommandHandler : IRequestHandler<BookSessionCommand, Res
             if (session == null)
             {
                 return Result<BookingDto>.FailureResult("NOT_FOUND", "Session not found");
+            }
+
+            // Feature 22: Subscription-Gated Session check
+            StudentSubscription? activeSubscription = null;
+            if (session.RequiresSubscription)
+            {
+                activeSubscription = await _subscriptionRepository.FirstOrDefaultAsync(
+                    s => s.StudentId == userId.Value && s.Status == SubscriptionStatus.Active && s.EndDate > DateTime.UtcNow,
+                    cancellationToken);
+                if (activeSubscription == null)
+                    return Result<BookingDto>.FailureResult("SUBSCRIPTION_REQUIRED",
+                        "This session is exclusive to subscribers. Please subscribe to a plan to book.");
             }
 
             // Check if already booked FIRST (before capacity check, so pending bookings can retry payment)
@@ -214,6 +229,14 @@ public class BookSessionCommandHandler : IRequestHandler<BookSessionCommand, Res
             };
 
             await _bookingRepository.AddAsync(booking, cancellationToken);
+
+            // Feature 23: Increment sessions-used counter on the active subscription
+            if (activeSubscription != null)
+            {
+                activeSubscription.SessionsUsed += 1;
+                activeSubscription.UpdatedAt = DateTime.UtcNow;
+                await _subscriptionRepository.UpdateAsync(activeSubscription, cancellationToken);
+            }
 
             // Free session (or fully covered by points) — skip Razorpay entirely and confirm immediately
             if (totalAmount == 0)

@@ -12,7 +12,6 @@ namespace LiveExpert.API.Controllers.Shared;
 /// Referral program endpoints
 /// </summary>
 [Route("api/shared/referrals")]
-[Authorize(Roles = "Student")]
 [ApiController]
 public class ReferralsController : ControllerBase
 {
@@ -23,24 +22,48 @@ public class ReferralsController : ControllerBase
         _mediator = mediator;
     }
 
+    /// <summary>Feature: Get student referral code and summary stats</summary>
     [HttpGet("code")]
+    [Authorize(Roles = "Student")]
     public async Task<IActionResult> GetReferralCode()
     {
         var result = await _mediator.Send(new GetReferralCodeQuery());
         return Ok(result);
     }
 
+    /// <summary>Feature 18: Get tutor's own referral code for referring other tutors</summary>
+    [HttpGet("tutor-code")]
+    [Authorize(Roles = "Tutor")]
+    public async Task<IActionResult> GetTutorReferralCode()
+    {
+        var result = await _mediator.Send(new GetTutorReferralCodeQuery());
+        return Ok(result);
+    }
+
+    /// <summary>Get referral stats (monthly breakdown)</summary>
     [HttpGet("stats")]
+    [Authorize(Roles = "Student")]
     public async Task<IActionResult> GetStats()
     {
         var result = await _mediator.Send(new GetReferralStatsQuery());
         return Ok(result);
     }
 
+    /// <summary>Get referral history with expiry and status info</summary>
     [HttpGet("history")]
+    [Authorize(Roles = "Student")]
     public async Task<IActionResult> GetHistory()
     {
         var result = await _mediator.Send(new GetReferralHistoryQuery());
+        return Ok(result);
+    }
+
+    /// <summary>Feature 19: Public leaderboard — top 10 referrers this month</summary>
+    [HttpGet("leaderboard")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetLeaderboard()
+    {
+        var result = await _mediator.Send(new GetReferralLeaderboardQuery());
         return Ok(result);
     }
 }

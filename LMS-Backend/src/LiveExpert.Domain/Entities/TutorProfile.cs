@@ -76,6 +76,9 @@ public class TutorProfile : BaseEntity
     /// <summary>Whether a verification-nudge reminder has already been sent to this tutor.</summary>
     public bool VerificationReminderSent { get; set; } = false;
 
+    /// <summary>Referral code tutors can share to refer other tutors. Reward: bonus on referred tutor's first month earnings.</summary>
+    public string? TutorReferralCode { get; set; }
+
     // ── Auto-Payout ───────────────────────────────────────────────────────────
     public AutoPayoutSchedule AutoPayoutSchedule { get; set; } = AutoPayoutSchedule.Disabled;
 

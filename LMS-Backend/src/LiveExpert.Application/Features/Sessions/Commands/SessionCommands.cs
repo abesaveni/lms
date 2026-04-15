@@ -16,6 +16,8 @@ public class CreateSessionCommand : IRequest<Result<SessionDto>>
     public int Duration { get; set; }
     public decimal BasePrice { get; set; }
     public int MaxStudents { get; set; } = 1;
+    /// <summary>Feature 22: When true, only subscribed students can book this session.</summary>
+    public bool RequiresSubscription { get; set; } = false;
 }
 
 // Update Session Command
@@ -28,6 +30,7 @@ public class UpdateSessionCommand : IRequest<Result<SessionDto>>
     public int Duration { get; set; }
     public decimal BasePrice { get; set; }
     public SessionPricingType PricingType { get; set; } = SessionPricingType.Fixed;
+    public bool RequiresSubscription { get; set; } = false;
 }
 
 // Cancel Session Command
@@ -103,6 +106,7 @@ public class SessionDto
     public string? MeetingLink { get; set; }
     public bool IsBooked { get; set; }
     public bool IsReviewed { get; set; }
+    public bool RequiresSubscription { get; set; }
     public DateTime CreatedAt { get; set; }
 }
 

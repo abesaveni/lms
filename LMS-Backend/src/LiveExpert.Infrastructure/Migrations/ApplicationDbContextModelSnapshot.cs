@@ -1507,6 +1507,12 @@ namespace LiveExpert.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsTutorReferral")
+                        .HasColumnType("INTEGER");
+
                     b.Property<decimal>("JoiningBonusAmount")
                         .HasColumnType("TEXT");
 
@@ -1635,6 +1641,9 @@ namespace LiveExpert.Infrastructure.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsReminderSent")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("RequiresSubscription")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("MaxStudents")
@@ -2310,6 +2319,10 @@ namespace LiveExpert.Infrastructure.Migrations
 
                     b.Property<bool>("VerificationReminderSent")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("TutorReferralCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("TEXT");
@@ -4140,6 +4153,9 @@ namespace LiveExpert.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("SessionsLimit")
+                        .HasColumnType("INTEGER");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("TEXT");
 
@@ -4152,6 +4168,12 @@ namespace LiveExpert.Infrastructure.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("AutoRenew")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("CancellationReason")
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAt")
@@ -4172,8 +4194,26 @@ namespace LiveExpert.Infrastructure.Migrations
                     b.Property<Guid?>("PaymentId")
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("PendingCancellation")
+                        .HasColumnType("INTEGER");
+
                     b.Property<Guid>("PlanId")
                         .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("RenewalReminderSentAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("RetentionDiscountOffered")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("RetentionDiscountPercent")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("RetentionOfferExpiry")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SessionsUsed")
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("StartDate")
                         .HasColumnType("TEXT");

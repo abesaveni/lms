@@ -1,4 +1,5 @@
 using LiveExpert.Application.Common;
+using LiveExpert.Application.Features.Auth.Handlers;
 using LiveExpert.Application.Interfaces;
 using LiveExpert.Domain.Entities;
 using LiveExpert.Domain.Enums;
@@ -17,9 +18,12 @@ public class PaymentsController : ControllerBase
     private readonly IRepository<Session> _sessionRepository;
     private readonly IRepository<User> _userRepository;
     private readonly IRepository<TutorEarning> _tutorEarningRepository;
+    private readonly IRepository<ReferralProgram> _referralRepository;
+    private readonly IRepository<BonusPoint> _bonusPointRepository;
     private readonly ICurrentUserService _currentUserService;
     private readonly IPaymentService _paymentService;
     private readonly INotificationDispatcher _notificationDispatcher;
+    private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IConfiguration _config;
 
@@ -29,9 +33,12 @@ public class PaymentsController : ControllerBase
         IRepository<Session> sessionRepository,
         IRepository<User> userRepository,
         IRepository<TutorEarning> tutorEarningRepository,
+        IRepository<ReferralProgram> referralRepository,
+        IRepository<BonusPoint> bonusPointRepository,
         ICurrentUserService currentUserService,
         IPaymentService paymentService,
         INotificationDispatcher notificationDispatcher,
+        INotificationService notificationService,
         IUnitOfWork unitOfWork,
         IConfiguration config)
     {
@@ -40,9 +47,12 @@ public class PaymentsController : ControllerBase
         _sessionRepository = sessionRepository;
         _userRepository = userRepository;
         _tutorEarningRepository = tutorEarningRepository;
+        _referralRepository = referralRepository;
+        _bonusPointRepository = bonusPointRepository;
         _currentUserService = currentUserService;
         _paymentService = paymentService;
         _notificationDispatcher = notificationDispatcher;
+        _notificationService = notificationService;
         _unitOfWork = unitOfWork;
         _config = config;
     }
@@ -123,6 +133,75 @@ public class PaymentsController : ControllerBase
             };
 
             await _tutorEarningRepository.AddAsync(earning, cancellationToken);
+
+            // ── Features 16+17+20: First-payment referral unlock ─────────────
+            // Check if this is the student's first ever payment
+            var priorPayments = await _paymentRepository.FindAsync(
+                p => p.StudentId == userId.Value && p.Status == PaymentStatus.Success && p.Id != payment.Id,
+                cancellationToken);
+
+            if (!priorPayments.Any())
+            {
+                // Find a pending referral for this student (they were referred by someone)
+                var pendingReferral = await _referralRepository.FirstOrDefaultAsync(
+                    r => r.ReferredUserId == userId.Value
+                        && r.Status == "Pending"
+                        && !r.IsTutorReferral
+                        && r.ReferralBonusPaidAt == null,
+                    cancellationToken);
+
+                if (pendingReferral != null)
+                {
+                    var isExpired = pendingReferral.ExpiresAt.HasValue && pendingReferral.ExpiresAt.Value < DateTime.UtcNow;
+                    if (!isExpired)
+                    {
+                        // Feature 20: Tiered reward — count how many completed referrals the referrer already has
+                        var completedReferrals = await _referralRepository.FindAsync(
+                            r => r.ReferrerId == pendingReferral.ReferrerId
+                                && r.ReferralBonusPaidAt != null
+                                && !r.IsTutorReferral,
+                            cancellationToken);
+                        var completedCount = completedReferrals.Count();
+                        var bonusPoints = RegisterCommandHandler.CalculateTieredReferralBonus(completedCount);
+
+                        // Award tiered bonus to referrer
+                        await _bonusPointRepository.AddAsync(new BonusPoint
+                        {
+                            Id = Guid.NewGuid(),
+                            UserId = pendingReferral.ReferrerId,
+                            Points = bonusPoints,
+                            Reason = BonusPointReason.Referral,
+                            ReferenceId = userId.Value,
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        }, cancellationToken);
+
+                        // Mark referral completed
+                        pendingReferral.Status = "Completed";
+                        pendingReferral.RewardCredits = bonusPoints;
+                        pendingReferral.ReferralBonusPaidAt = DateTime.UtcNow;
+                        pendingReferral.RewardedAt = DateTime.UtcNow;
+                        await _referralRepository.UpdateAsync(pendingReferral, cancellationToken);
+
+                        // Notify referrer of earned bonus
+                        try
+                        {
+                            await _notificationService.SendNotificationAsync(
+                                pendingReferral.ReferrerId,
+                                "Referral Bonus Unlocked!",
+                                $"You earned {bonusPoints} bonus points — your referred friend just made their first payment!",
+                                NotificationType.ReferralBonus,
+                                null,
+                                cancellationToken);
+                        }
+                        catch { /* do not block payment confirmation */ }
+                    }
+                }
+            }
+
+            // ── Feature 18: Tutor referral milestone check ──────────────────
+            // When a tutor completes their 5th session, unlock the referrer's 100-pt bonus
+            // This is checked in SessionCommandHandlers.CompleteSession — placeholder here for context
 
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
 

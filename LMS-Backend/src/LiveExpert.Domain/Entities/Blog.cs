@@ -45,6 +45,12 @@ public class ReferralProgram : BaseEntity
     public DateTime? JoiningBonusPaidAt { get; set; }
     public DateTime? RewardedAt { get; set; }
 
+    /// <summary>First-payment must happen before this date for referrer to earn bonus (30-day window)</summary>
+    public DateTime? ExpiresAt { get; set; }
+
+    /// <summary>True when a tutor referred another tutor (uses TutorReferralCode instead of student code)</summary>
+    public bool IsTutorReferral { get; set; } = false;
+
     // Navigation Properties
     public User Referrer { get; set; } = null!;
     public User ReferredUser { get; set; } = null!;
