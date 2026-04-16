@@ -18,7 +18,8 @@ RUN dotnet publish LiveExpert.API.csproj -c Release -o /app/publish --no-restore
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 
-# Create non-root user
+# Install curl for healthcheck, then create non-root user
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 RUN groupadd --system appgroup && useradd --system --gid appgroup appuser
 
 # Copy published output
