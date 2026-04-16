@@ -183,6 +183,8 @@ const Register = () => {
         const [firstName, ...lastParts] = formData.name.split(' ')
         const lastName = lastParts.join(' ').trim()
 
+        const studentBaseUsername = formData.email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '_').replace(/_{2,}/g, '_').replace(/^_|_$/g, '').slice(0, 44)
+        const studentRandomSuffix = Math.random().toString(36).substring(2, 6)
         const registerResponse = await apiPost<{
           success: boolean
           data?: {
@@ -192,7 +194,7 @@ const Register = () => {
           }
           error?: { code: string; message: string }
         }>('/student/register', {
-          username: formData.email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '_').replace(/_{2,}/g, '_').replace(/^_|_$/g, '').slice(0, 50),
+          username: `${studentBaseUsername}_${studentRandomSuffix}`,
           email: formData.email,
           password: formData.password,
           phoneNumber: (formData.phone || formData.whatsappNumber).replace(/\s+/g, ''),
@@ -374,12 +376,14 @@ const Register = () => {
         const lastName = lastParts.join(' ').trim()
 
         // 1. Register
+        const baseUsername = formData.email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '_').replace(/_{2,}/g, '_').replace(/^_|_$/g, '').slice(0, 44)
+        const randomSuffix = Math.random().toString(36).substring(2, 6)
         const registerResponse = await apiPost<{
           success: boolean
           data?: { userId: string; email: string; role: string }
           error?: { code: string; message: string }
         }>('/tutor/register', {
-          username: formData.email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '_').replace(/_{2,}/g, '_').replace(/^_|_$/g, '').slice(0, 50),
+          username: `${baseUsername}_${randomSuffix}`,
           email: formData.email,
           password: formData.password,
           phoneNumber: (formData.phone || formData.whatsappNumber || '').replace(/\s+/g, '') || undefined,
@@ -686,6 +690,19 @@ const Register = () => {
                     Verify & Continue
                     <Check className="ml-2 w-5 h-5" />
                   </Button>
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    fullWidth
+                    onClick={() => {
+                      setTutorStep(1)
+                      setVerificationCode('')
+                      setErrors({})
+                    }}
+                  >
+                    Back — Change Email or Password
+                  </Button>
                 </div>
               )}
 
@@ -850,6 +867,18 @@ const Register = () => {
 
                   <Button fullWidth onClick={handleTutorNext} isLoading={isTutorSubmitting}>
                     {isTutorSubmitting ? 'Creating your account…' : 'Create Account & Submit for Review'}
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    fullWidth
+                    onClick={() => {
+                      setTutorStep(1)
+                      setErrors({})
+                    }}
+                  >
+                    Back — Change Name or Email
                   </Button>
 
                   <p className="text-xs text-gray-500 text-center">
