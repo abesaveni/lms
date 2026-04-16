@@ -6,7 +6,7 @@ import { Card } from '../../components/ui/Card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/Tabs'
 import { Badge } from '../../components/ui/Badge'
 import { Avatar } from '../../components/ui/Avatar'
-import { getTutorSessions, SessionDto, startSession, joinSession, markSessionComplete } from '../../services/sessionsApi'
+import { getTutorSessions, SessionDto, startSession, markSessionComplete } from '../../services/sessionsApi'
 
 const TutorSessions = () => {
   const navigate = useNavigate()
@@ -31,22 +31,16 @@ const TutorSessions = () => {
   const handleStartSession = async (sessionId: string) => {
     setActionError(null)
     try {
-      const { meetUrl } = await startSession(sessionId);
-      window.open(meetUrl, '_blank');
-      fetchSessions(); // Refresh to update status
+      await startSession(sessionId);
+      fetchSessions(); // Refresh to update Live status
+      navigate(`/session/${sessionId}/join`);
     } catch (err: any) {
       setActionError(err.message || "Failed to start session");
     }
   }
 
   const handleJoinSession = async (sessionId: string) => {
-    setActionError(null)
-    try {
-      const { meetUrl } = await joinSession(sessionId);
-      window.open(meetUrl, '_blank');
-    } catch (err: any) {
-      setActionError(err.message || "Failed to join session. Make sure you have started it first.");
-    }
+    navigate(`/session/${sessionId}/join`);
   }
 
   const handleMarkComplete = async (sessionId: string) => {
