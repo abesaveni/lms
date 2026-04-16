@@ -55,6 +55,16 @@ public class GetReferralCodeQueryHandler : IRequestHandler<GetReferralCodeQuery,
         if (studentProfile == null)
             return Result<ReferralCodeDto>.FailureResult("NOT_FOUND", "Student profile not found");
 
+        // Auto-generate referral code for existing students who were registered before this feature was added
+        if (string.IsNullOrWhiteSpace(studentProfile.ReferralCode))
+        {
+            var prefix = user.Username.ToUpper().Substring(0, Math.Min(3, user.Username.Length));
+            var unique = Guid.NewGuid().ToString("N").Substring(0, 6).ToUpper();
+            studentProfile.ReferralCode = $"{prefix}{unique}";
+            studentProfile.UpdatedAt = DateTime.UtcNow;
+            await _studentRepository.UpdateAsync(studentProfile, cancellationToken);
+        }
+
         var referrals = await _referralRepository.FindAsync(
             r => r.ReferrerId == userId.Value && !r.IsTutorReferral, cancellationToken);
         var list = referrals.ToList();

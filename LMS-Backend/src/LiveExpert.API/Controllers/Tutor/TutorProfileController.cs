@@ -271,7 +271,7 @@ public class TutorProfileController : ControllerBase
                 checkCmd.CommandText = "PRAGMA table_info(Users)";
                 var cols = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 using (var reader = await checkCmd.ExecuteReaderAsync()) { while (await reader.ReadAsync()) cols.Add(reader["name"].ToString()!); }
-                foreach (var col in new[] { "Language", "Timezone" }) {
+                foreach (var col in new[] { "Language", "Timezone", "Location", "Bio", "DateOfBirth" }) {
                     if (!cols.Contains(col)) {
                         using var alterCmd = connection.CreateCommand();
                         alterCmd.CommandText = $"ALTER TABLE Users ADD COLUMN {col} TEXT NULL";

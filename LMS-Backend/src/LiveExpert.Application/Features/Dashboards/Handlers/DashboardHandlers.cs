@@ -282,6 +282,15 @@ public class GetTutorDashboardQueryHandler : IRequestHandler<GetTutorDashboardQu
             }
         }
 
+        int totalStudentsFromBookings = 0;
+        if (sessions.Any())
+        {
+            try { totalStudentsFromBookings = (await _bookingRepository.FindAsync(b => sessions.Select(s => s.Id).Contains(b.SessionId) && b.BookingStatus != BookingStatus.Cancelled, cancellationToken)).Select(b => b.StudentId).Distinct().Count(); } catch { }
+        }
+        int totalStudentsFromFollowers = 0;
+        try { totalStudentsFromFollowers = (await _followerRepository.FindAsync(f => f.TutorId == userId.Value, cancellationToken)).Count(); } catch { }
+        int totalStudents = Math.Max(totalStudentsFromBookings, totalStudentsFromFollowers);
+
         var dto = new TutorDashboardDto
         {
             TotalSessions = sessions.Count(),
@@ -289,16 +298,7 @@ public class GetTutorDashboardQueryHandler : IRequestHandler<GetTutorDashboardQu
             UpcomingSessionsCount = upcomingSessions.Count,
             TotalEarnings = earnings.Sum(e => e.NetAmount),
             AvailableBalance = earnings.Where(e => e.Status == EarningStatus.Available).Sum(e => e.NetAmount),
-            TotalStudents = await (async () => {
-                int fromBookings = 0;
-                if (sessions.Any())
-                {
-                    try { fromBookings = (await _bookingRepository.FindAsync(b => sessions.Select(s => s.Id).Contains(b.SessionId) && b.BookingStatus != BookingStatus.Cancelled, cancellationToken)).Select(b => b.StudentId).Distinct().Count(); } catch { }
-                }
-                int fromFollowers = 0;
-                try { fromFollowers = (await _followerRepository.FindAsync(f => f.TutorId == userId.Value, cancellationToken)).Count(); } catch { }
-                return Math.Max(fromBookings, fromFollowers);
-            })(),
+            TotalStudents = totalStudents,
             AverageRating = tutorProfile?.AverageRating ?? 0,
             TotalReviews = tutorProfile?.TotalReviews ?? 0,
             UpcomingSessions = upcomingSessionDtos,
