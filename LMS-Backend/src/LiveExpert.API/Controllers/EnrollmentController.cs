@@ -182,7 +182,7 @@ public class EnrollmentController : ControllerBase
                 SubjectName = e.Course.SubjectName,
                 TutorName = e.Course.Tutor.FirstName + " " + e.Course.Tutor.LastName,
                 EnrollmentType = e.EnrollmentType.ToString(),
-                e.SessionsPurchased, e.SessionsCompleted, SessionsRemaining = e.SessionsRemaining,
+                e.SessionsPurchased, e.SessionsCompleted, SessionsRemaining = e.SessionsPurchased > e.SessionsCompleted ? e.SessionsPurchased - e.SessionsCompleted : 0,
                 e.AmountPaid, Status = e.Status.ToString(),
                 e.EnrolledAt, e.ExpiresAt, e.CompletedAt,
                 ProgressPercent = e.SessionsPurchased > 0 ? (int)((double)e.SessionsCompleted / e.SessionsPurchased * 100) : 0
