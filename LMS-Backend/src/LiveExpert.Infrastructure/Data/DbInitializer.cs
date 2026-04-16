@@ -225,6 +225,18 @@ public static class DbInitializer
                 if (!noShowProtectionExists) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE Sessions ADD COLUMN NoShowProtection INTEGER NOT NULL DEFAULT 0"; c2.ExecuteNonQuery(); }
                 if (!requiresSubscriptionExists) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE Sessions ADD COLUMN RequiresSubscription INTEGER NOT NULL DEFAULT 0"; c2.ExecuteNonQuery(); }
 
+                // ── Sessions: GoogleCalendarEventId (AddTutorProfileMissingFields migration) ──
+                checkCmd.CommandText = "PRAGMA table_info(Sessions)";
+                bool sessGoogleCalId = false;
+                using (var sessReader2 = checkCmd.ExecuteReader())
+                {
+                    while (sessReader2.Read())
+                    {
+                        if (sessReader2["name"].ToString() == "GoogleCalendarEventId") { sessGoogleCalId = true; break; }
+                    }
+                }
+                if (!sessGoogleCalId) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE Sessions ADD COLUMN GoogleCalendarEventId TEXT NULL"; c2.ExecuteNonQuery(); }
+
                 // ── TutorProfiles: all new columns ───────────────────────────────────
                 checkCmd.CommandText = "PRAGMA table_info(TutorProfiles)";
                 bool hasBgCheck = false, bgCheckDate = false, tpVerifReminder = false;
@@ -364,6 +376,44 @@ public static class DbInitializer
                 if (!tpTutorRefCode) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorProfiles ADD COLUMN TutorReferralCode TEXT NULL"; c2.ExecuteNonQuery(); }
                 if (!tpAutoPayout) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorProfiles ADD COLUMN AutoPayoutSchedule INTEGER NOT NULL DEFAULT 0"; c2.ExecuteNonQuery(); }
                 if (!tpAutoPayoutMin) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorProfiles ADD COLUMN AutoPayoutMinimumAmount TEXT NOT NULL DEFAULT '1000'"; c2.ExecuteNonQuery(); }
+
+                // ── TutorProfiles: verification + onboarding columns (Jan-2026 migration) ──
+                bool tpGovtId = false, tpIsProfileComplete = false, tpIsVisible = false;
+                bool tpOnboardingStep = false, tpVerificationId = false, tpVerifiedAt = false;
+                bool tpVerifiedBy = false, tpRejectionReason = false, tpVideoIntroUrl = false;
+                bool tpResumeUrl = false, tpCalendarAccessToken = false, tpCalendarRefreshToken = false;
+                checkCmd.CommandText = "PRAGMA table_info(TutorProfiles)";
+                using (var tpReader3 = checkCmd.ExecuteReader())
+                {
+                    while (tpReader3.Read())
+                    {
+                        var col = tpReader3["name"].ToString();
+                        if (col == "GovtIdUrl") tpGovtId = true;
+                        if (col == "IsProfileComplete") tpIsProfileComplete = true;
+                        if (col == "IsVisible") tpIsVisible = true;
+                        if (col == "OnboardingStep") tpOnboardingStep = true;
+                        if (col == "VerificationId") tpVerificationId = true;
+                        if (col == "VerifiedAt") tpVerifiedAt = true;
+                        if (col == "VerifiedBy") tpVerifiedBy = true;
+                        if (col == "RejectionReason") tpRejectionReason = true;
+                        if (col == "VideoIntroUrl") tpVideoIntroUrl = true;
+                        if (col == "ResumeUrl") tpResumeUrl = true;
+                        if (col == "CalendarAccessToken") tpCalendarAccessToken = true;
+                        if (col == "CalendarRefreshToken") tpCalendarRefreshToken = true;
+                    }
+                }
+                if (!tpGovtId) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorProfiles ADD COLUMN GovtIdUrl TEXT NULL"; c2.ExecuteNonQuery(); }
+                if (!tpIsProfileComplete) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorProfiles ADD COLUMN IsProfileComplete INTEGER NOT NULL DEFAULT 0"; c2.ExecuteNonQuery(); }
+                if (!tpIsVisible) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorProfiles ADD COLUMN IsVisible INTEGER NOT NULL DEFAULT 0"; c2.ExecuteNonQuery(); }
+                if (!tpOnboardingStep) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorProfiles ADD COLUMN OnboardingStep INTEGER NOT NULL DEFAULT 0"; c2.ExecuteNonQuery(); }
+                if (!tpVerificationId) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorProfiles ADD COLUMN VerificationId TEXT NULL"; c2.ExecuteNonQuery(); }
+                if (!tpVerifiedAt) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorProfiles ADD COLUMN VerifiedAt TEXT NULL"; c2.ExecuteNonQuery(); }
+                if (!tpVerifiedBy) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorProfiles ADD COLUMN VerifiedBy TEXT NULL"; c2.ExecuteNonQuery(); }
+                if (!tpRejectionReason) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorProfiles ADD COLUMN RejectionReason TEXT NULL"; c2.ExecuteNonQuery(); }
+                if (!tpVideoIntroUrl) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorProfiles ADD COLUMN VideoIntroUrl TEXT NULL"; c2.ExecuteNonQuery(); }
+                if (!tpResumeUrl) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorProfiles ADD COLUMN ResumeUrl TEXT NULL"; c2.ExecuteNonQuery(); }
+                if (!tpCalendarAccessToken) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorProfiles ADD COLUMN CalendarAccessToken TEXT NULL"; c2.ExecuteNonQuery(); }
+                if (!tpCalendarRefreshToken) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorProfiles ADD COLUMN CalendarRefreshToken TEXT NULL"; c2.ExecuteNonQuery(); }
 
                 // ── StudentSubscriptions: new feature cols ────────────────────────
                 checkCmd.CommandText = "PRAGMA table_info(StudentSubscriptions)";
