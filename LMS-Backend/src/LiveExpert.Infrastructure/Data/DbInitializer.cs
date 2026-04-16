@@ -1045,6 +1045,56 @@ public static class DbInitializer
                 if (!sbGoals) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE SessionBookings ADD COLUMN Goals TEXT NULL"; c2.ExecuteNonQuery(); }
                 if (!sbCurrentLevel) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE SessionBookings ADD COLUMN CurrentLevel TEXT NULL"; c2.ExecuteNonQuery(); }
                 if (!sbTopics) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE SessionBookings ADD COLUMN Topics TEXT NULL"; c2.ExecuteNonQuery(); }
+
+                // ── Create PayoutRequests table if missing ────────────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='PayoutRequests'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS PayoutRequests (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            TutorId TEXT NOT NULL,
+                            BankAccountId TEXT NOT NULL DEFAULT '',
+                            Amount TEXT NOT NULL DEFAULT '0',
+                            Status TEXT NOT NULL DEFAULT 'Pending',
+                            RequestedAt TEXT NOT NULL,
+                            ProcessedAt TEXT NULL,
+                            ProcessedBy TEXT NULL,
+                            AdminNotes TEXT NULL,
+                            TransactionReference TEXT NULL,
+                            PaymentMethod TEXT NOT NULL DEFAULT 'Bank Transfer',
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL,
+                            FOREIGN KEY (TutorId) REFERENCES Users(Id) ON DELETE CASCADE
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── Create BankAccounts table if missing ──────────────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='BankAccounts'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS BankAccounts (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            TutorId TEXT NOT NULL,
+                            AccountHolderName TEXT NOT NULL DEFAULT '',
+                            AccountNumber TEXT NOT NULL DEFAULT '',
+                            BankName TEXT NOT NULL DEFAULT '',
+                            BranchName TEXT NULL,
+                            IFSCCode TEXT NOT NULL DEFAULT '',
+                            AccountType TEXT NOT NULL DEFAULT 'Savings',
+                            IsDefault INTEGER NOT NULL DEFAULT 0,
+                            IsVerified INTEGER NOT NULL DEFAULT 0,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL,
+                            FOREIGN KEY (TutorId) REFERENCES Users(Id) ON DELETE CASCADE
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
             }
         }
         catch (Exception ex)

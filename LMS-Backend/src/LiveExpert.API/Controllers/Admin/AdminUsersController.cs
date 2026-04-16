@@ -44,34 +44,52 @@ public class AdminUsersController : ControllerBase
 
         var totalRecords = await query.CountAsync();
 
-        var users = await query
+        // Materialize raw DB rows first (no .ToString() inside EF Core SQL)
+        var rawUsers = await query
             .OrderByDescending(u => u.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(u => new
             {
-                id              = u.Id.ToString(),
-                username        = u.Username,
-                email           = u.Email,
-                phoneNumber     = u.PhoneNumber,
-                role            = u.Role.ToString(),
-                isActive        = u.IsActive,
-                isEmailVerified = u.IsEmailVerified,
-                isPhoneVerified = u.IsPhoneVerified,
-                createdAt       = u.CreatedAt,
-                lastLoginAt     = u.LastLoginAt
+                u.Id,
+                u.Username,
+                u.Email,
+                u.PhoneNumber,
+                u.Role,
+                u.IsActive,
+                u.IsEmailVerified,
+                u.IsPhoneVerified,
+                u.CreatedAt,
+                u.LastLoginAt
             })
             .ToListAsync();
+
+        // Convert to the response shape in memory
+        var users = rawUsers.Select(u => new
+        {
+            id              = u.Id.ToString(),
+            username        = u.Username,
+            email           = u.Email,
+            phoneNumber     = u.PhoneNumber,
+            role            = u.Role.ToString(),
+            isActive        = u.IsActive,
+            isEmailVerified = u.IsEmailVerified,
+            isPhoneVerified = u.IsPhoneVerified,
+            createdAt       = u.CreatedAt,
+            lastLoginAt     = u.LastLoginAt
+        }).ToList();
 
         // Attach tutor verificationStatus for Tutor-role users
         var tutorIds = users.Where(u => u.role == "Tutor")
             .Select(u => Guid.Parse(u.id)).ToList();
 
+        // Materialize TutorProfiles without .ToString() in EF Core SQL
         var tutorStatuses = tutorIds.Any()
-            ? await _context.TutorProfiles
+            ? (await _context.TutorProfiles
                 .Where(t => tutorIds.Contains(t.UserId))
-                .Select(t => new { t.UserId, status = t.VerificationStatus.ToString() })
-                .ToDictionaryAsync(t => t.UserId, t => t.status)
+                .Select(t => new { t.UserId, t.VerificationStatus })
+                .ToListAsync())
+                .ToDictionary(t => t.UserId, t => t.VerificationStatus.ToString())
             : new Dictionary<Guid, string>();
 
         var result = users.Select(u => new
