@@ -246,7 +246,7 @@ public class EnrollmentController : ControllerBase
         var studentId = GetUserId();
         var hasExisting = await _db.TrialSessions
             .AnyAsync(t => t.TutorId == req.TutorId && t.StudentId == studentId, ct);
-        if (hasExisting) return BadRequest(new { error = "You have already booked a trial with this tutor." });
+        if (hasExisting) return BadRequest(new { message = "You have already booked a trial with this tutor." });
 
         Course? course = req.CourseId.HasValue
             ? await _db.Courses.FirstOrDefaultAsync(c => c.Id == req.CourseId.Value, ct)

@@ -105,11 +105,17 @@ const CourseDetailPage = () => {
     setEnrolling(true)
     try {
       const res = await bookTrial({ tutorId: course.tutor.tutorId, courseId: id })
-      setSuccessMessage(res.message || 'Trial booked successfully!')
+      setSuccessMessage(res.message || 'Trial booked! The tutor will confirm your slot shortly.')
       setError(null)
     } catch (err: any) {
-      setError(err.message || 'Failed to book trial')
-      setSuccessMessage(null)
+      const msg = err.message || ''
+      if (msg.includes('already booked') || msg.includes('already have') || msg.includes('400')) {
+        setSuccessMessage('You have already booked a trial with this tutor. Check your sessions for the upcoming trial.')
+        setError(null)
+      } else {
+        setError(msg || 'Failed to book trial. Please try again.')
+        setSuccessMessage(null)
+      }
     } finally {
       setEnrolling(false)
     }

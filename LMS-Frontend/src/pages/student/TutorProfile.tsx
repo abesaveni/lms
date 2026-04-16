@@ -45,10 +45,14 @@ const TutorProfile = () => {
         const data = await getTutorById(id)
         setTutor(data)
         setFollowerCount(data.followerCount || 0)
-        
-        // Fetch tutor's upcoming sessions using UserId (database link for sessions)
-        const sessionData = await getSessions({ tutorId: data.userId, upcoming: true })
-        setSessions(sessionData.items)
+
+        // Fetch tutor's upcoming sessions — non-critical if sessions table not yet set up
+        try {
+          const sessionData = await getSessions({ tutorId: data.userId, upcoming: true })
+          setSessions(sessionData.items)
+        } catch {
+          // Non-critical — sessions may be unavailable
+        }
 
         // Fetch subject rates
         try {
@@ -58,10 +62,14 @@ const TutorProfile = () => {
           // Non-critical
         }
 
-        // Fetch tutor's reviews - Use UserId as backend expects it for followers/reviews
-        const reviewData = await getTutorReviews(data.userId)
-        setReviews(reviewData.items)
-        
+        // Fetch tutor's reviews — non-critical
+        try {
+          const reviewData = await getTutorReviews(data.userId)
+          setReviews(reviewData.items)
+        } catch {
+          // Non-critical — reviews may be unavailable
+        }
+
         // Load follow status using UserId (data.userId is the database link for followers)
         if (isAuthenticated) {
           try {

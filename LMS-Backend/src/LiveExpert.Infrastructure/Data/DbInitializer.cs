@@ -2,6 +2,7 @@ using LiveExpert.Domain.Entities;
 using LiveExpert.Domain.Enums;
 using BCrypt.Net;
 using Microsoft.EntityFrameworkCore;
+using System.Data;
 
 namespace LiveExpert.Infrastructure.Data;
 
@@ -23,7 +24,9 @@ public static class DbInitializer
             if (dbType != null && dbType.Contains("Sqlite"))
             {
                 using var connection = context.Database.GetDbConnection();
-                connection.Open();
+                // Connection may already be open if EF Core opened it; only open if closed
+                if (connection.State != System.Data.ConnectionState.Open)
+                    connection.Open();
                 using var checkCmd = connection.CreateCommand();
                 checkCmd.CommandText = "PRAGMA table_info(Sessions)";
                 bool columnExists = false;
@@ -374,6 +377,625 @@ public static class DbInitializer
                     }
                 }
                 if (!spSessionsLimit) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE SubscriptionPlans ADD COLUMN SessionsLimit INTEGER NOT NULL DEFAULT 0"; c2.ExecuteNonQuery(); }
+
+                // ── Create Courses table if missing ───────────────────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='Courses'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS Courses (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            TutorId TEXT NOT NULL,
+                            Title TEXT NOT NULL DEFAULT '',
+                            ShortDescription TEXT NULL,
+                            FullDescription TEXT NULL,
+                            SubjectId TEXT NULL,
+                            SubjectName TEXT NULL,
+                            CategoryName TEXT NULL,
+                            Level INTEGER NOT NULL DEFAULT 0,
+                            Language TEXT NOT NULL DEFAULT 'English',
+                            ThumbnailUrl TEXT NULL,
+                            TagsJson TEXT NULL,
+                            TotalSessions INTEGER NOT NULL DEFAULT 1,
+                            SessionDurationMinutes INTEGER NOT NULL DEFAULT 60,
+                            DeliveryType INTEGER NOT NULL DEFAULT 0,
+                            MaxStudentsPerBatch INTEGER NOT NULL DEFAULT 1,
+                            PricePerSession TEXT NOT NULL DEFAULT '0',
+                            BundlePrice TEXT NULL,
+                            AllowPartialBooking INTEGER NOT NULL DEFAULT 1,
+                            MinSessionsForPartial INTEGER NOT NULL DEFAULT 1,
+                            RefundPolicy TEXT NULL,
+                            TrialAvailable INTEGER NOT NULL DEFAULT 0,
+                            TrialDurationMinutes INTEGER NOT NULL DEFAULT 30,
+                            TrialPrice TEXT NOT NULL DEFAULT '0',
+                            Prerequisites TEXT NULL,
+                            MaterialsRequired TEXT NULL,
+                            WhatYouWillLearn TEXT NULL,
+                            SyllabusJson TEXT NULL,
+                            Status INTEGER NOT NULL DEFAULT 0,
+                            IsVisible INTEGER NOT NULL DEFAULT 1,
+                            AverageRating TEXT NOT NULL DEFAULT '0',
+                            TotalReviews INTEGER NOT NULL DEFAULT 0,
+                            TotalEnrollments INTEGER NOT NULL DEFAULT 0,
+                            PublishedAt TEXT NULL,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL,
+                            FOREIGN KEY (TutorId) REFERENCES Users(Id) ON DELETE CASCADE
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── Create CourseSessions table if missing ────────────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='CourseSessions'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS CourseSessions (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            CourseId TEXT NOT NULL,
+                            SessionNumber INTEGER NOT NULL DEFAULT 1,
+                            Title TEXT NOT NULL DEFAULT '',
+                            Description TEXT NULL,
+                            TopicsCovered TEXT NULL,
+                            ScheduledAt TEXT NULL,
+                            DurationMinutes INTEGER NOT NULL DEFAULT 60,
+                            MeetingLink TEXT NULL,
+                            HomeworkAssigned TEXT NULL,
+                            TutorNotes TEXT NULL,
+                            Status INTEGER NOT NULL DEFAULT 0,
+                            StudentId TEXT NULL,
+                            AttendedAt TEXT NULL,
+                            CompletedAt TEXT NULL,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL,
+                            FOREIGN KEY (CourseId) REFERENCES Courses(Id) ON DELETE CASCADE
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── Create CourseEnrollments table if missing ─────────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='CourseEnrollments'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS CourseEnrollments (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            CourseId TEXT NOT NULL,
+                            StudentId TEXT NOT NULL,
+                            EnrollmentType INTEGER NOT NULL DEFAULT 0,
+                            SessionsPurchased INTEGER NOT NULL DEFAULT 0,
+                            SessionsCompleted INTEGER NOT NULL DEFAULT 0,
+                            AmountPaid TEXT NOT NULL DEFAULT '0',
+                            PlatformFee TEXT NOT NULL DEFAULT '0',
+                            TutorEarningAmount TEXT NOT NULL DEFAULT '0',
+                            GatewayOrderId TEXT NULL,
+                            GatewayPaymentId TEXT NULL,
+                            GatewaySignature TEXT NULL,
+                            Status INTEGER NOT NULL DEFAULT 0,
+                            EnrolledAt TEXT NOT NULL,
+                            ExpiresAt TEXT NULL,
+                            CompletedAt TEXT NULL,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL,
+                            FOREIGN KEY (CourseId) REFERENCES Courses(Id) ON DELETE CASCADE,
+                            FOREIGN KEY (StudentId) REFERENCES Users(Id) ON DELETE CASCADE
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── Create TrialSessions table if missing ─────────────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='TrialSessions'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS TrialSessions (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            TutorId TEXT NOT NULL,
+                            StudentId TEXT NOT NULL,
+                            CourseId TEXT NULL,
+                            ScheduledAt TEXT NULL,
+                            DurationMinutes INTEGER NOT NULL DEFAULT 30,
+                            MeetingLink TEXT NULL,
+                            Price TEXT NOT NULL DEFAULT '0',
+                            GatewayOrderId TEXT NULL,
+                            GatewayPaymentId TEXT NULL,
+                            Status INTEGER NOT NULL DEFAULT 0,
+                            CompletedAt TEXT NULL,
+                            StudentFeedback TEXT NULL,
+                            StudentRating INTEGER NULL,
+                            ConvertedToEnrollment INTEGER NOT NULL DEFAULT 0,
+                            EnrollmentId TEXT NULL,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL,
+                            FOREIGN KEY (TutorId) REFERENCES Users(Id) ON DELETE CASCADE,
+                            FOREIGN KEY (StudentId) REFERENCES Users(Id) ON DELETE CASCADE
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── Create TutorEarnings table if missing ─────────────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='TutorEarnings'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS TutorEarnings (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            TutorId TEXT NOT NULL,
+                            SourceType TEXT NOT NULL DEFAULT '',
+                            SourceId TEXT NOT NULL,
+                            BookingId TEXT NULL,
+                            Amount TEXT NOT NULL DEFAULT '0',
+                            CommissionPercentage TEXT NOT NULL DEFAULT '0',
+                            CommissionAmount TEXT NOT NULL DEFAULT '0',
+                            NetAmount TEXT NOT NULL DEFAULT '0',
+                            Status INTEGER NOT NULL DEFAULT 0,
+                            AvailableAt TEXT NULL,
+                            ReleasedAt TEXT NULL,
+                            Notes TEXT NULL,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL,
+                            FOREIGN KEY (TutorId) REFERENCES Users(Id) ON DELETE CASCADE
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+                else
+                {
+                    // TutorEarnings exists — ensure BookingId column is present
+                    checkCmd.CommandText = "PRAGMA table_info(TutorEarnings)";
+                    bool teBookingId = false;
+                    using (var teReader = checkCmd.ExecuteReader())
+                    {
+                        while (teReader.Read())
+                        {
+                            if (teReader["name"].ToString() == "BookingId") { teBookingId = true; break; }
+                        }
+                    }
+                    if (!teBookingId) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorEarnings ADD COLUMN BookingId TEXT NULL"; c2.ExecuteNonQuery(); }
+                }
+
+                // ── Create PlatformFeePayments table if missing ───────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='PlatformFeePayments'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS PlatformFeePayments (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            BookingId TEXT NOT NULL,
+                            StudentId TEXT NOT NULL,
+                            TutorId TEXT NOT NULL,
+                            SessionId TEXT NOT NULL,
+                            FeeAmount TEXT NOT NULL DEFAULT '0',
+                            FeeType TEXT NOT NULL DEFAULT 'Fixed',
+                            GatewayOrderId TEXT NULL,
+                            GatewayPaymentId TEXT NULL,
+                            Status INTEGER NOT NULL DEFAULT 0,
+                            PaidAt TEXT NULL,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── Create DailyChallenges table if missing ───────────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='DailyChallenges'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS DailyChallenges (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            Title TEXT NOT NULL DEFAULT '',
+                            Description TEXT NULL,
+                            Type INTEGER NOT NULL DEFAULT 0,
+                            Difficulty INTEGER NOT NULL DEFAULT 0,
+                            SubjectName TEXT NULL,
+                            QuestionData TEXT NULL,
+                            CorrectAnswer TEXT NULL,
+                            Explanation TEXT NULL,
+                            XPReward INTEGER NOT NULL DEFAULT 10,
+                            BonusPointsReward INTEGER NOT NULL DEFAULT 0,
+                            IsActive INTEGER NOT NULL DEFAULT 1,
+                            AvailableDate TEXT NOT NULL,
+                            ExpiresAt TEXT NULL,
+                            TotalAttempts INTEGER NOT NULL DEFAULT 0,
+                            CorrectAttempts INTEGER NOT NULL DEFAULT 0,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── Create UserChallengeAttempts table if missing ─────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='UserChallengeAttempts'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS UserChallengeAttempts (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            UserId TEXT NOT NULL,
+                            ChallengeId TEXT NOT NULL,
+                            SubmittedAnswer TEXT NULL,
+                            IsCorrect INTEGER NOT NULL DEFAULT 0,
+                            XPEarned INTEGER NOT NULL DEFAULT 0,
+                            BonusPointsEarned INTEGER NOT NULL DEFAULT 0,
+                            TimeTakenSeconds INTEGER NOT NULL DEFAULT 0,
+                            AttemptedAt TEXT NOT NULL,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL,
+                            FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── Create UserChallengeStreaks table if missing ───────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='UserChallengeStreaks'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS UserChallengeStreaks (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            UserId TEXT NOT NULL,
+                            CurrentStreak INTEGER NOT NULL DEFAULT 0,
+                            LongestStreak INTEGER NOT NULL DEFAULT 0,
+                            TotalXPEarned INTEGER NOT NULL DEFAULT 0,
+                            LastCompletedDate TEXT NULL,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL,
+                            FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── Create SessionNotes table if missing ──────────────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='SessionNotes'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS SessionNotes (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            SessionId TEXT NOT NULL,
+                            BookingId TEXT NULL,
+                            TutorId TEXT NOT NULL,
+                            StudentId TEXT NULL,
+                            Content TEXT NOT NULL DEFAULT '',
+                            NoteType INTEGER NOT NULL DEFAULT 0,
+                            IsSharedWithStudent INTEGER NOT NULL DEFAULT 0,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── Create SessionAssignments table if missing ────────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='SessionAssignments'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS SessionAssignments (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            SessionId TEXT NOT NULL,
+                            TutorId TEXT NOT NULL,
+                            StudentId TEXT NOT NULL,
+                            Title TEXT NOT NULL DEFAULT '',
+                            Description TEXT NULL,
+                            DueDate TEXT NULL,
+                            MaxScore INTEGER NOT NULL DEFAULT 100,
+                            Status INTEGER NOT NULL DEFAULT 0,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── Create AssignmentSubmissions table if missing ─────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='AssignmentSubmissions'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS AssignmentSubmissions (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            AssignmentId TEXT NOT NULL,
+                            StudentId TEXT NOT NULL,
+                            SubmissionText TEXT NULL,
+                            FileUrl TEXT NULL,
+                            Score INTEGER NULL,
+                            Feedback TEXT NULL,
+                            SubmittedAt TEXT NOT NULL,
+                            GradedAt TEXT NULL,
+                            Status INTEGER NOT NULL DEFAULT 0,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── Create StudentRatings table if missing ────────────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='StudentRatings'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS StudentRatings (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            SessionId TEXT NOT NULL,
+                            TutorId TEXT NOT NULL,
+                            StudentId TEXT NOT NULL,
+                            Engagement INTEGER NOT NULL DEFAULT 3,
+                            Preparedness INTEGER NOT NULL DEFAULT 3,
+                            Communication INTEGER NOT NULL DEFAULT 3,
+                            OverallScore INTEGER NOT NULL DEFAULT 3,
+                            Notes TEXT NULL,
+                            RatedAt TEXT NOT NULL,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── Create TutorAvailabilities table if missing ───────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='TutorAvailabilities'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS TutorAvailabilities (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            TutorId TEXT NOT NULL,
+                            DayOfWeek INTEGER NOT NULL DEFAULT 0,
+                            StartTime TEXT NOT NULL DEFAULT '09:00',
+                            EndTime TEXT NOT NULL DEFAULT '17:00',
+                            IsAvailable INTEGER NOT NULL DEFAULT 1,
+                            TimeZone TEXT NOT NULL DEFAULT 'UTC',
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL,
+                            FOREIGN KEY (TutorId) REFERENCES Users(Id) ON DELETE CASCADE
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── Create SessionWaitlists table if missing ──────────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='SessionWaitlists'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS SessionWaitlists (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            SessionId TEXT NOT NULL,
+                            StudentId TEXT NOT NULL,
+                            Position INTEGER NOT NULL DEFAULT 1,
+                            Status INTEGER NOT NULL DEFAULT 0,
+                            NotifiedAt TEXT NULL,
+                            ExpiresAt TEXT NULL,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── Create SessionBundles table if missing ────────────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='SessionBundles'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS SessionBundles (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            TutorId TEXT NOT NULL,
+                            Title TEXT NOT NULL DEFAULT '',
+                            Description TEXT NULL,
+                            SessionCount INTEGER NOT NULL DEFAULT 5,
+                            TotalPrice TEXT NOT NULL DEFAULT '0',
+                            PricePerSession TEXT NOT NULL DEFAULT '0',
+                            ValidityDays INTEGER NOT NULL DEFAULT 90,
+                            IsActive INTEGER NOT NULL DEFAULT 1,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── Create BundlePurchases table if missing ───────────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='BundlePurchases'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS BundlePurchases (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            BundleId TEXT NOT NULL,
+                            StudentId TEXT NOT NULL,
+                            TutorId TEXT NOT NULL,
+                            SessionsRemaining INTEGER NOT NULL DEFAULT 0,
+                            AmountPaid TEXT NOT NULL DEFAULT '0',
+                            Status INTEGER NOT NULL DEFAULT 0,
+                            ExpiresAt TEXT NULL,
+                            PurchasedAt TEXT NOT NULL,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── Create TutorInquiries table if missing ────────────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='TutorInquiries'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS TutorInquiries (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            TutorId TEXT NOT NULL,
+                            StudentId TEXT NOT NULL,
+                            Subject TEXT NOT NULL DEFAULT '',
+                            Message TEXT NOT NULL DEFAULT '',
+                            PreferredTime TEXT NULL,
+                            Budget TEXT NULL,
+                            Status INTEGER NOT NULL DEFAULT 0,
+                            TutorResponse TEXT NULL,
+                            RespondedAt TEXT NULL,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── Create SubscriptionPlans table if missing ─────────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='SubscriptionPlans'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS SubscriptionPlans (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            Name TEXT NOT NULL DEFAULT '',
+                            Description TEXT NULL,
+                            Price TEXT NOT NULL DEFAULT '0',
+                            BillingCycle INTEGER NOT NULL DEFAULT 0,
+                            SessionsLimit INTEGER NOT NULL DEFAULT 0,
+                            Features TEXT NULL,
+                            IsActive INTEGER NOT NULL DEFAULT 1,
+                            DisplayOrder INTEGER NOT NULL DEFAULT 0,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── Create StudentSubscriptions table if missing ──────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='StudentSubscriptions'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS StudentSubscriptions (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            StudentId TEXT NOT NULL,
+                            PlanId TEXT NOT NULL,
+                            Status INTEGER NOT NULL DEFAULT 0,
+                            SessionsUsed INTEGER NOT NULL DEFAULT 0,
+                            AutoRenew INTEGER NOT NULL DEFAULT 0,
+                            StartDate TEXT NOT NULL,
+                            EndDate TEXT NOT NULL,
+                            RenewalReminderSentAt TEXT NULL,
+                            CancellationReason TEXT NULL,
+                            RetentionDiscountOffered INTEGER NOT NULL DEFAULT 0,
+                            RetentionDiscountPercent TEXT NOT NULL DEFAULT '0',
+                            RetentionOfferExpiry TEXT NULL,
+                            PendingCancellation INTEGER NOT NULL DEFAULT 0,
+                            GatewayOrderId TEXT NULL,
+                            GatewayPaymentId TEXT NULL,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── Create LearningPaths table if missing ─────────────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='LearningPaths'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS LearningPaths (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            Title TEXT NOT NULL DEFAULT '',
+                            Description TEXT NULL,
+                            SubjectName TEXT NULL,
+                            Level INTEGER NOT NULL DEFAULT 0,
+                            EstimatedWeeks INTEGER NOT NULL DEFAULT 4,
+                            ThumbnailUrl TEXT NULL,
+                            IsPublic INTEGER NOT NULL DEFAULT 1,
+                            CreatedById TEXT NOT NULL,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── Create LearningPathSteps table if missing ─────────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='LearningPathSteps'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS LearningPathSteps (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            LearningPathId TEXT NOT NULL,
+                            StepOrder INTEGER NOT NULL DEFAULT 1,
+                            Title TEXT NOT NULL DEFAULT '',
+                            Description TEXT NULL,
+                            ResourceType TEXT NULL,
+                            ResourceId TEXT NULL,
+                            ResourceUrl TEXT NULL,
+                            EstimatedMinutes INTEGER NOT NULL DEFAULT 60,
+                            IsRequired INTEGER NOT NULL DEFAULT 1,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── Create LearningPathEnrollments table if missing ───────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='LearningPathEnrollments'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS LearningPathEnrollments (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            LearningPathId TEXT NOT NULL,
+                            StudentId TEXT NOT NULL,
+                            CurrentStepOrder INTEGER NOT NULL DEFAULT 1,
+                            CompletedSteps INTEGER NOT NULL DEFAULT 0,
+                            Status INTEGER NOT NULL DEFAULT 0,
+                            EnrolledAt TEXT NOT NULL,
+                            CompletedAt TEXT NULL,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── Create TutorSubjectRates table if missing (ensure has all cols) ────
+                // (already handled above but double-check for TrialRate column)
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='TutorSubjectRates'";
+                if (checkCmd.ExecuteScalar() != null)
+                {
+                    checkCmd.CommandText = "PRAGMA table_info(TutorSubjectRates)";
+                    bool tsrTrialRate = false;
+                    using (var tsrReader = checkCmd.ExecuteReader())
+                    {
+                        while (tsrReader.Read())
+                        {
+                            if (tsrReader["name"].ToString() == "TrialRate") { tsrTrialRate = true; break; }
+                        }
+                    }
+                    if (!tsrTrialRate) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorSubjectRates ADD COLUMN TrialRate TEXT NULL"; c2.ExecuteNonQuery(); }
+                }
+
+                // ── Ensure SessionBookings has PointsDiscount column ──────────────────
+                checkCmd.CommandText = "PRAGMA table_info(SessionBookings)";
+                bool sbPointsDiscount = false;
+                using (var sbReader2 = checkCmd.ExecuteReader())
+                {
+                    while (sbReader2.Read())
+                    {
+                        if (sbReader2["name"].ToString() == "PointsDiscount") { sbPointsDiscount = true; break; }
+                    }
+                }
+                if (!sbPointsDiscount) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE SessionBookings ADD COLUMN PointsDiscount TEXT NOT NULL DEFAULT '0'"; c2.ExecuteNonQuery(); }
             }
         }
         catch (Exception ex)

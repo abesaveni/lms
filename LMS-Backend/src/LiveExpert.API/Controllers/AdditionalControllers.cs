@@ -390,40 +390,48 @@ public class TutorsController : ControllerBase
     [HttpGet("{id}/profile")]
     public async Task<IActionResult> GetTutorProfile(Guid id)
     {
-        var tutor = await _tutorRepository.GetByIdAsync(id) 
-                    ?? await _tutorRepository.FirstOrDefaultAsync(t => t.UserId == id);
-                    
-        if (tutor == null)
-            return NotFound(Result.FailureResult("NOT_FOUND", "Tutor profile not found"));
-
-        var user = await _userRepository.GetByIdAsync(tutor.UserId);
-        var followerCount = user != null ? await _followerRepository.CountAsync(f => f.TutorId == user.Id) : 0;
-        
-        return Ok(Result<object>.SuccessResult(new
+        try
         {
-            Id = tutor.Id,
-            UserId = user?.Id,
-            Name = user?.Username ?? (user?.FirstName != null ? user.FirstName + " " + user.LastName : user?.Username),
-            Email = user?.Email,
-            Bio = tutor.Bio,
-            Headline = tutor.Headline,
-            HourlyRate = tutor.HourlyRate,
-            YearsOfExperience = tutor.YearsOfExperience,
-            AverageRating = tutor.AverageRating,
-            TotalReviews = tutor.TotalReviews,
-            TotalSessions = tutor.TotalSessions,
-            VerificationStatus = tutor.VerificationStatus.ToString(),
-            ProfileImage = user?.ProfileImageUrl,
-            FollowerCount = followerCount,
-            Location = user?.Location,
-            HasBackgroundCheck = tutor.HasBackgroundCheck,
-            TrialAvailable = tutor.TrialAvailable,
-            TrialDurationMinutes = tutor.TrialDurationMinutes,
-            TrialPrice = tutor.TrialPrice,
-            Subjects = string.IsNullOrEmpty(tutor.Skills)
-                ? new string[] { }
-                : tutor.Skills.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).ToArray()
-        }));
+            var tutor = await _tutorRepository.GetByIdAsync(id)
+                        ?? await _tutorRepository.FirstOrDefaultAsync(t => t.UserId == id);
+
+            if (tutor == null)
+                return NotFound(Result.FailureResult("NOT_FOUND", "Tutor profile not found"));
+
+            var user = await _userRepository.GetByIdAsync(tutor.UserId);
+            var followerCount = 0;
+            try { followerCount = user != null ? await _followerRepository.CountAsync(f => f.TutorId == user.Id) : 0; } catch { }
+
+            return Ok(Result<object>.SuccessResult(new
+            {
+                Id = tutor.Id,
+                UserId = user?.Id,
+                Name = user?.FirstName != null ? (user.FirstName + " " + user.LastName).Trim() : user?.Username,
+                Email = user?.Email,
+                Bio = tutor.Bio,
+                Headline = tutor.Headline,
+                HourlyRate = tutor.HourlyRate,
+                YearsOfExperience = tutor.YearsOfExperience,
+                AverageRating = tutor.AverageRating,
+                TotalReviews = tutor.TotalReviews,
+                TotalSessions = tutor.TotalSessions,
+                VerificationStatus = tutor.VerificationStatus.ToString(),
+                ProfileImage = user?.ProfileImageUrl,
+                FollowerCount = followerCount,
+                Location = user?.Location,
+                HasBackgroundCheck = tutor.HasBackgroundCheck,
+                TrialAvailable = tutor.TrialAvailable,
+                TrialDurationMinutes = tutor.TrialDurationMinutes,
+                TrialPrice = tutor.TrialPrice,
+                Subjects = string.IsNullOrEmpty(tutor.Skills)
+                    ? new string[] { }
+                    : tutor.Skills.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).ToArray()
+            }));
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, Result.FailureResult("SERVER_ERROR", $"Failed to load tutor profile: {ex.Message}"));
+        }
     }
 
     [AllowAnonymous]
