@@ -462,6 +462,7 @@ public static class DbInitializer
                         CREATE TABLE IF NOT EXISTS CourseSessions (
                             Id TEXT NOT NULL PRIMARY KEY,
                             CourseId TEXT NOT NULL,
+                            TutorId TEXT NOT NULL,
                             SessionNumber INTEGER NOT NULL DEFAULT 1,
                             Title TEXT NOT NULL DEFAULT '',
                             Description TEXT NULL,
@@ -469,15 +470,15 @@ public static class DbInitializer
                             ScheduledAt TEXT NULL,
                             DurationMinutes INTEGER NOT NULL DEFAULT 60,
                             MeetingLink TEXT NULL,
-                            HomeworkAssigned TEXT NULL,
-                            TutorNotes TEXT NULL,
+                            RecordingUrl TEXT NULL,
                             Status INTEGER NOT NULL DEFAULT 0,
-                            StudentId TEXT NULL,
-                            AttendedAt TEXT NULL,
                             CompletedAt TEXT NULL,
+                            TutorNotes TEXT NULL,
+                            HomeworkAssigned TEXT NULL,
                             CreatedAt TEXT NOT NULL,
                             UpdatedAt TEXT NOT NULL,
-                            FOREIGN KEY (CourseId) REFERENCES Courses(Id) ON DELETE CASCADE
+                            FOREIGN KEY (CourseId) REFERENCES Courses(Id) ON DELETE CASCADE,
+                            FOREIGN KEY (TutorId) REFERENCES Users(Id) ON DELETE CASCADE
                         )";
                     c2.ExecuteNonQuery();
                 }
@@ -502,9 +503,12 @@ public static class DbInitializer
                             GatewayPaymentId TEXT NULL,
                             GatewaySignature TEXT NULL,
                             Status INTEGER NOT NULL DEFAULT 0,
-                            EnrolledAt TEXT NOT NULL,
+                            EnrolledAt TEXT NULL,
                             ExpiresAt TEXT NULL,
                             CompletedAt TEXT NULL,
+                            CancellationReason TEXT NULL,
+                            RefundAmount TEXT NULL,
+                            RefundedAt TEXT NULL,
                             CreatedAt TEXT NOT NULL,
                             UpdatedAt TEXT NOT NULL,
                             FOREIGN KEY (CourseId) REFERENCES Courses(Id) ON DELETE CASCADE,
@@ -598,18 +602,14 @@ public static class DbInitializer
                     c2.CommandText = @"
                         CREATE TABLE IF NOT EXISTS PlatformFeePayments (
                             Id TEXT NOT NULL PRIMARY KEY,
-                            BookingId TEXT NOT NULL,
                             StudentId TEXT NOT NULL,
-                            TutorId TEXT NOT NULL,
-                            SessionId TEXT NOT NULL,
-                            FeeAmount TEXT NOT NULL DEFAULT '0',
-                            FeeType TEXT NOT NULL DEFAULT 'Fixed',
-                            GatewayOrderId TEXT NULL,
-                            GatewayPaymentId TEXT NULL,
-                            Status INTEGER NOT NULL DEFAULT 0,
-                            PaidAt TEXT NULL,
+                            Amount TEXT NOT NULL DEFAULT '0',
+                            GatewayOrderId TEXT NOT NULL DEFAULT '',
+                            GatewayPaymentId TEXT NOT NULL DEFAULT '',
+                            PeriodStart TEXT NOT NULL,
+                            PeriodEnd TEXT NOT NULL,
                             CreatedAt TEXT NOT NULL,
-                            UpdatedAt TEXT NOT NULL
+                            FOREIGN KEY (StudentId) REFERENCES Users(Id) ON DELETE CASCADE
                         )";
                     c2.ExecuteNonQuery();
                 }

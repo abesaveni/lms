@@ -132,7 +132,7 @@ public class CourseController : ControllerBase
             .Select(c => new
             {
                 c.Id, c.Title, c.ShortDescription, c.SubjectName, c.CategoryName,
-                c.Level, c.Language, c.ThumbnailUrl, c.TotalSessions, c.SessionDurationMinutes,
+                Level = c.Level.ToString(), c.Language, c.ThumbnailUrl, c.TotalSessions, c.SessionDurationMinutes,
                 DeliveryType = c.DeliveryType.ToString(),
                 c.PricePerSession, c.BundlePrice, c.TrialAvailable, c.TrialPrice,
                 c.TrialDurationMinutes, c.AverageRating, c.TotalReviews, c.TotalEnrollments,
