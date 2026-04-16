@@ -48,24 +48,38 @@ public class BillingController : ControllerBase
             })
             .ToListAsync(ct);
 
-        var courseItems = await _db.CourseEnrollments
+        // Materialize from DB first — cannot assign anonymous type to object? inside EF Core SQL query
+        var rawCourseEnrollments = await _db.CourseEnrollments
             .Include(e => e.Course)
             .Where(e => e.StudentId == studentId)
             .OrderByDescending(e => e.EnrolledAt)
-            .Select(e => new BillingItem
+            .Select(e => new
             {
-                Id = e.Id.ToString(),
-                Type = "Course",
-                Title = e.Course.Title,
-                Amount = e.AmountPaid,
-                PlatformFee = e.PlatformFee,
-                Status = e.Status.ToString(),
-                PaymentMethod = "Razorpay",
-                GatewayPaymentId = e.GatewayPaymentId,
-                Date = e.EnrolledAt ?? e.CreatedAt,
-                Extra = new { e.SessionsPurchased, e.SessionsCompleted }
+                e.Id,
+                CourseTitle      = e.Course.Title,
+                e.AmountPaid,
+                e.PlatformFee,
+                Status           = e.Status.ToString(),
+                e.GatewayPaymentId,
+                Date             = e.EnrolledAt ?? e.CreatedAt,
+                e.SessionsPurchased,
+                e.SessionsCompleted
             })
             .ToListAsync(ct);
+
+        var courseItems = rawCourseEnrollments.Select(e => new BillingItem
+        {
+            Id               = e.Id.ToString(),
+            Type             = "Course",
+            Title            = e.CourseTitle,
+            Amount           = e.AmountPaid,
+            PlatformFee      = e.PlatformFee,
+            Status           = e.Status,
+            PaymentMethod    = "Razorpay",
+            GatewayPaymentId = e.GatewayPaymentId,
+            Date             = e.Date,
+            Extra            = new { e.SessionsPurchased, e.SessionsCompleted }
+        }).ToList();
 
         var all = sessionItems
             .Concat(courseItems)
