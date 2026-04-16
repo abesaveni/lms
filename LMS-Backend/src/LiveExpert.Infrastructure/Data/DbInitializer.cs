@@ -1095,6 +1095,124 @@ public static class DbInitializer
                     c2.ExecuteNonQuery();
                 }
 
+                // ── Create TutorVerifications table if missing ────────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='TutorVerifications'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS TutorVerifications (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            TutorId TEXT NOT NULL,
+                            Status TEXT NOT NULL DEFAULT 'Pending',
+                            AdminNotes TEXT NULL,
+                            VerifiedBy TEXT NULL,
+                            VerifiedAt TEXT NULL,
+                            RejectionReason TEXT NULL,
+                            GovtIdUrl TEXT NULL,
+                            IntroVideoUrl TEXT NULL,
+                            ResumeUrl TEXT NULL,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL,
+                            FOREIGN KEY (TutorId) REFERENCES Users(Id) ON DELETE CASCADE
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── Create ApiSettings table if missing ───────────────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='ApiSettings'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS ApiSettings (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            Provider TEXT NOT NULL DEFAULT '',
+                            KeyName TEXT NOT NULL DEFAULT '',
+                            KeyValue TEXT NOT NULL DEFAULT '',
+                            IsActive INTEGER NOT NULL DEFAULT 1,
+                            Metadata TEXT NULL,
+                            Description TEXT NULL,
+                            LastValidatedAt TEXT NULL,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── Create CookieConsents table if missing ────────────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='CookieConsents'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS CookieConsents (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            UserId TEXT NULL,
+                            Necessary INTEGER NOT NULL DEFAULT 1,
+                            Functional INTEGER NOT NULL DEFAULT 0,
+                            Analytics INTEGER NOT NULL DEFAULT 0,
+                            Marketing INTEGER NOT NULL DEFAULT 0,
+                            IpAddress TEXT NULL,
+                            UserAgent TEXT NULL,
+                            ConsentGivenAt TEXT NOT NULL,
+                            ConsentUpdatedAt TEXT NULL,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL,
+                            CreatedBy TEXT NULL,
+                            UpdatedBy TEXT NULL,
+                            DeletedAt TEXT NULL,
+                            FOREIGN KEY (UserId) REFERENCES Users(Id)
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── Create Referrals table if missing ─────────────────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='Referrals'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS Referrals (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            ReferrerUserId TEXT NOT NULL,
+                            ReferredUserId TEXT NOT NULL,
+                            ReferralCode TEXT NOT NULL DEFAULT '',
+                            Status INTEGER NOT NULL DEFAULT 0,
+                            BonusCredits TEXT NOT NULL DEFAULT '0',
+                            RewardedAt TEXT NULL,
+                            TriggerReferenceId TEXT NULL,
+                            TriggerActivityType TEXT NULL,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL,
+                            FOREIGN KEY (ReferrerUserId) REFERENCES Users(Id),
+                            FOREIGN KEY (ReferredUserId) REFERENCES Users(Id)
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── Create TutorGoogleTokens table if missing ─────────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='TutorGoogleTokens'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS TutorGoogleTokens (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            TutorId TEXT NOT NULL,
+                            AccessToken TEXT NOT NULL DEFAULT '',
+                            RefreshToken TEXT NOT NULL DEFAULT '',
+                            TokenExpiry TEXT NOT NULL,
+                            GoogleEmail TEXT NOT NULL DEFAULT '',
+                            IsActive INTEGER NOT NULL DEFAULT 1,
+                            LastRefreshedAt TEXT NULL,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL,
+                            FOREIGN KEY (TutorId) REFERENCES Users(Id) ON DELETE CASCADE
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
             }
         }
         catch (Exception ex)
