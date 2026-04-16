@@ -86,6 +86,33 @@ public static class DbInitializer
                     System.Diagnostics.Debug.WriteLine("✓ Repaired database: Added Location column to Users table.");
                 }
 
+                // Check for Language and Timezone in Users table
+                bool languageExists = false;
+                bool timezoneExists = false;
+                checkCmd.CommandText = "PRAGMA table_info(Users)";
+                using var userReader2 = checkCmd.ExecuteReader();
+                while (userReader2.Read())
+                {
+                    var colName = userReader2["name"].ToString();
+                    if (colName == "Language") languageExists = true;
+                    if (colName == "Timezone") timezoneExists = true;
+                }
+                userReader2.Close();
+                if (!languageExists)
+                {
+                    using var alterCmd = connection.CreateCommand();
+                    alterCmd.CommandText = "ALTER TABLE Users ADD COLUMN Language TEXT NULL";
+                    alterCmd.ExecuteNonQuery();
+                    System.Diagnostics.Debug.WriteLine("✓ Repaired database: Added Language column to Users table.");
+                }
+                if (!timezoneExists)
+                {
+                    using var alterCmd = connection.CreateCommand();
+                    alterCmd.CommandText = "ALTER TABLE Users ADD COLUMN Timezone TEXT NULL";
+                    alterCmd.ExecuteNonQuery();
+                    System.Diagnostics.Debug.WriteLine("✓ Repaired database: Added Timezone column to Users table.");
+                }
+
                 // Check for HourlyRateGroup in TutorProfiles table
                 checkCmd.CommandText = "PRAGMA table_info(TutorProfiles)";
                 bool hourlyRateGroupExists = false;

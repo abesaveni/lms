@@ -41,6 +41,13 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.ProfileImageUrl)
             .HasMaxLength(500);
 
+        // Additional user fields (added via schema repair in DbInitializer for existing databases)
+        builder.Property(u => u.Bio);
+        builder.Property(u => u.DateOfBirth);
+        builder.Property(u => u.Location).HasMaxLength(255);
+        builder.Property(u => u.Language).HasMaxLength(50);
+        builder.Property(u => u.Timezone).HasMaxLength(100);
+
         // Indexes
         builder.HasIndex(u => u.Username).IsUnique();
         builder.HasIndex(u => u.Email).IsUnique();

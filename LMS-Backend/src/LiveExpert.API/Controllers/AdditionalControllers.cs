@@ -98,9 +98,11 @@ public class UsersController : ControllerBase
             user.FirstName,
             user.LastName,
             Role = user.Role.ToString(),
-            user.ProfileImageUrl, 
+            user.ProfileImageUrl,
             user.DateOfBirth,
             user.Location,
+            user.Language,
+            user.Timezone,
             user.IsEmailVerified,
             user.IsPhoneVerified,
             user.IsWhatsAppVerified,
@@ -147,6 +149,12 @@ public class UsersController : ControllerBase
             
         if (request.Location != null)
             user.Location = request.Location;
+
+        if (request.Language != null)
+            user.Language = request.Language;
+
+        if (request.Timezone != null)
+            user.Timezone = request.Timezone;
 
         // Handle Base64 Image Upload (matching tutor pattern)
         if (!string.IsNullOrEmpty(request.ProfilePictureBase64))
@@ -256,6 +264,8 @@ public class UpdateProfileRequest
     public string? ProfilePictureFileName { get; set; }
     public DateTime? DateOfBirth { get; set; }
     public string? Location { get; set; }
+    public string? Language { get; set; }
+    public string? Timezone { get; set; }
 }
 
 public class UploadProfileImageRequest
