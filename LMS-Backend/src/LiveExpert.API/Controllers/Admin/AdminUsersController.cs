@@ -19,13 +19,16 @@ public class AdminUsersController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
     private readonly IEncryptionService _encryptionService;
+    private readonly ILogger<AdminUsersController> _logger;
 
     public AdminUsersController(
         ApplicationDbContext context,
-        IEncryptionService encryptionService)
+        IEncryptionService encryptionService,
+        ILogger<AdminUsersController> logger)
     {
         _context = context;
         _encryptionService = encryptionService;
+        _logger = logger;
     }
 
     /// <summary>
@@ -223,19 +226,110 @@ public class AdminUsersController : ControllerBase
     }
 
     /// <summary>
-    /// Delete a user account
+    /// Delete a user account and all associated data
     /// </summary>
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteUser(Guid id)
     {
-        var user = await _context.Users.FindAsync(id);
-        if (user == null)
-            return NotFound(Result.FailureResult("NOT_FOUND", "User not found"));
+        try
+        {
+            var user = await _context.Users
+                .Include(u => u.TutorProfile)
+                .Include(u => u.StudentProfile)
+                .FirstOrDefaultAsync(u => u.Id == id);
 
-        _context.Users.Remove(user);
-        await _context.SaveChangesAsync();
+            if (user == null)
+                return NotFound(Result.FailureResult("NOT_FOUND", "User not found"));
 
-        return Ok(Result.SuccessResult("User deleted"));
+            if (user.Email == "superadmin@liveexpert.ai")
+                return BadRequest(Result.FailureResult("FORBIDDEN", "Super admin cannot be deleted"));
+
+            _logger.LogInformation("Hard deleting user {UserId} and all dependencies", id);
+
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                // Communication & Social
+                _context.Messages.RemoveRange(_context.Messages.Where(m => m.SenderId == id || m.ReceiverId == id));
+                _context.Conversations.RemoveRange(_context.Conversations.Where(c => c.User1Id == id || c.User2Id == id));
+                _context.Reviews.RemoveRange(_context.Reviews.Where(r => r.StudentId == id || r.TutorId == id));
+                _context.TutorFollowers.RemoveRange(_context.TutorFollowers.Where(f => f.TutorId == id || f.StudentId == id));
+                _context.ChatRequests.RemoveRange(_context.ChatRequests.Where(c => c.StudentId == id || c.TutorId == id || (c.LastActionById != null && c.LastActionById == id)));
+
+                // Sessions & Bookings
+                var userSessionIds = await _context.Sessions.Where(s => s.TutorId == id).Select(s => s.Id).ToListAsync();
+                await _context.SessionBookings.Where(b => b.StudentId == id || userSessionIds.Contains(b.SessionId)).ExecuteDeleteAsync();
+                _context.SessionMeetLinks.RemoveRange(_context.SessionMeetLinks.Where(l => userSessionIds.Contains(l.SessionId)));
+                _context.VirtualClassroomSessions.RemoveRange(_context.VirtualClassroomSessions.Where(v => v.TutorId == id));
+                _context.Sessions.RemoveRange(_context.Sessions.Where(s => s.TutorId == id));
+
+                // Courses & Enrollments
+                _context.TrialSessions.RemoveRange(_context.TrialSessions.Where(t => t.TutorId == id || t.StudentId == id));
+                _context.CourseEnrollments.RemoveRange(_context.CourseEnrollments.Where(e => e.StudentId == id));
+                var userCourseIds = await _context.Courses.Where(c => c.TutorId == id).Select(c => c.Id).ToListAsync();
+                if (userCourseIds.Any())
+                {
+                    _context.CourseEnrollments.RemoveRange(_context.CourseEnrollments.Where(e => userCourseIds.Contains(e.CourseId)));
+                    _context.CourseSessions.RemoveRange(_context.CourseSessions.Where(cs => userCourseIds.Contains(cs.CourseId)));
+                    _context.Courses.RemoveRange(_context.Courses.Where(c => c.TutorId == id));
+                }
+
+                // Financials
+                _context.Payments.RemoveRange(_context.Payments.Where(p => p.StudentId == id || p.TutorId == id));
+                _context.WithdrawalRequests.RemoveRange(_context.WithdrawalRequests.Where(w => w.UserId == id || (w.ProcessedBy != null && w.ProcessedBy == id)));
+                _context.PayoutRequests.RemoveRange(_context.PayoutRequests.Where(p => p.TutorId == id || (p.ProcessedBy != null && p.ProcessedBy == id)));
+                _context.TutorEarnings.RemoveRange(_context.TutorEarnings.Where(e => e.TutorId == id));
+                _context.BankAccounts.RemoveRange(_context.BankAccounts.Where(b => b.UserId == id));
+
+                // Tracking & Profile Extras
+                _context.Referrals.RemoveRange(_context.Referrals.Where(r => r.ReferrerUserId == id || r.ReferredUserId == id));
+                _context.KYCDocuments.RemoveRange(_context.KYCDocuments.Where(k => k.UserId == id || (k.VerifiedBy != null && k.VerifiedBy == id)));
+                _context.Notifications.RemoveRange(_context.Notifications.Where(n => n.UserId == id));
+                _context.UserConsents.RemoveRange(_context.UserConsents.Where(c => c.UserId == id));
+                _context.CookieConsents.RemoveRange(_context.CookieConsents.Where(c => c.UserId == id));
+                _context.BonusPoints.RemoveRange(_context.BonusPoints.Where(b => b.UserId == id));
+                _context.UserNotificationPreferences.RemoveRange(_context.UserNotificationPreferences.Where(p => p.UserId == id));
+
+                // Admin & System
+                _context.AuditLogs.RemoveRange(_context.AuditLogs.Where(a => a.UserId == id));
+                _context.WhatsAppCampaigns.RemoveRange(_context.WhatsAppCampaigns.Where(w => w.CreatedBy == id));
+                _context.AdminPermissions.RemoveRange(_context.AdminPermissions.Where(p => p.AdminId == id || (p.GrantedBy != null && p.GrantedBy == id)));
+
+                await _context.APIKeys.Where(k => k.UpdatedBy == id).ExecuteUpdateAsync(s => s.SetProperty(k => k.UpdatedBy, (Guid?)null));
+                await _context.SystemSettings.Where(s => s.UpdatedBy == id).ExecuteUpdateAsync(s => s.SetProperty(s => s.UpdatedBy, (Guid?)null));
+
+                _context.TutorGoogleTokens.RemoveRange(_context.TutorGoogleTokens.Where(t => t.TutorId == id));
+                _context.UserCalendarConnections.RemoveRange(_context.UserCalendarConnections.Where(c => c.UserId == id));
+
+                if (user.TutorProfile != null)
+                {
+                    _context.TutorVerifications.RemoveRange(_context.TutorVerifications.Where(v => v.TutorId == id));
+                    _context.TutorProfiles.Remove(user.TutorProfile);
+                }
+
+                if (user.StudentProfile != null)
+                    _context.StudentProfiles.Remove(user.StudentProfile);
+
+                _context.Users.Remove(user);
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+                _logger.LogInformation("Successfully purged user {UserId} from all system tables.", id);
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                _logger.LogError(ex, "Universal purge failed for user {UserId}", id);
+                throw;
+            }
+
+            return Ok(Result.SuccessResult("User and all associated data deleted permanently"));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to hard delete user {UserId}", id);
+            return StatusCode(500, Result.FailureResult("SERVER_ERROR", $"Deep delete failed. Error: {ex.Message}. Inner: {ex.InnerException?.Message}"));
+        }
     }
 }
 
