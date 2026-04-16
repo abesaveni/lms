@@ -6,6 +6,7 @@ import { Badge } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import { useNavigate } from 'react-router-dom'
 import { getTutorProfile, getTutorDashboardStats, TutorProfileDto } from '../../services/tutorApi'
+import { getMediaUrl } from '../../services/api'
 
 const TutorProfile = () => {
   const navigate = useNavigate()
@@ -55,6 +56,7 @@ const TutorProfile = () => {
   ]
 
   const fullName = profile ? `${profile.firstName} ${profile.lastName}`.trim() : '-'
+  const profileImageUrl = getMediaUrl(profile?.profilePictureUrl)
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -69,10 +71,10 @@ const TutorProfile = () => {
           <Card>
             <CardContent className="pt-6">
               <div className="flex flex-col md:flex-row items-start gap-6">
-                <Avatar 
-                  name={fullName} 
-                  src={profile?.profilePictureUrl}
-                  size="xl" 
+                <Avatar
+                  name={fullName}
+                  src={profileImageUrl}
+                  size="xl"
                 />
                 <div className="flex-1">
                   <div className="flex items-start justify-between mb-4">
