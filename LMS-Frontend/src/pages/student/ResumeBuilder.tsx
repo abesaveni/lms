@@ -79,6 +79,7 @@ function getAtsAnalysis(resumeText: string) {
 
 function AtsScoreBadge({ resumeText }: { resumeText: string }) {
   const { score, suggestions } = getAtsAnalysis(resumeText)
+  const score10 = Math.round(score / 10)
   const isAtsFriendly = score >= 80
 
   return (
@@ -86,12 +87,12 @@ function AtsScoreBadge({ resumeText }: { resumeText: string }) {
       {isAtsFriendly ? (
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-sm font-bold text-green-700 bg-green-50 border-green-200">
           <CheckCircle className="w-4 h-4" />
-          ATS Friendly — Score {score}/100
+          ATS Friendly — {score10}/10
         </div>
       ) : (
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-sm font-bold text-yellow-700 bg-yellow-50 border-yellow-200">
           <AlertCircle className="w-4 h-4" />
-          ATS Score: {score}/100 — Needs Improvement
+          ATS Score: {score10}/10 — Needs Improvement
         </div>
       )}
       {!isAtsFriendly && suggestions.length > 0 && (
