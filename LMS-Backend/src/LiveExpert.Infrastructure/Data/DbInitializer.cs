@@ -86,9 +86,14 @@ public static class DbInitializer
                     System.Diagnostics.Debug.WriteLine("✓ Repaired database: Added Location column to Users table.");
                 }
 
-                // Check for Language and Timezone in Users table
+                // Check for Language, Timezone, and other User columns
                 bool languageExists = false;
                 bool timezoneExists = false;
+                bool firstNameExists = false, lastNameExists = false;
+                bool emailVerifTokenExists = false, emailVerifTokenExpExists = false;
+                bool passwordResetTokenExists = false, passwordResetTokenExpExists = false;
+                bool isSubscribedExists = false, subscribedUntilExists = false;
+                bool trialStartDateExists = false, trialEndDateExists = false;
                 checkCmd.CommandText = "PRAGMA table_info(Users)";
                 using var userReader2 = checkCmd.ExecuteReader();
                 while (userReader2.Read())
@@ -96,22 +101,30 @@ public static class DbInitializer
                     var colName = userReader2["name"].ToString();
                     if (colName == "Language") languageExists = true;
                     if (colName == "Timezone") timezoneExists = true;
+                    if (colName == "FirstName") firstNameExists = true;
+                    if (colName == "LastName") lastNameExists = true;
+                    if (colName == "EmailVerificationToken") emailVerifTokenExists = true;
+                    if (colName == "EmailVerificationTokenExpiresAt") emailVerifTokenExpExists = true;
+                    if (colName == "PasswordResetToken") passwordResetTokenExists = true;
+                    if (colName == "PasswordResetTokenExpiresAt") passwordResetTokenExpExists = true;
+                    if (colName == "IsSubscribed") isSubscribedExists = true;
+                    if (colName == "SubscribedUntil") subscribedUntilExists = true;
+                    if (colName == "TrialStartDate") trialStartDateExists = true;
+                    if (colName == "TrialEndDate") trialEndDateExists = true;
                 }
                 userReader2.Close();
-                if (!languageExists)
-                {
-                    using var alterCmd = connection.CreateCommand();
-                    alterCmd.CommandText = "ALTER TABLE Users ADD COLUMN Language TEXT NULL";
-                    alterCmd.ExecuteNonQuery();
-                    System.Diagnostics.Debug.WriteLine("✓ Repaired database: Added Language column to Users table.");
-                }
-                if (!timezoneExists)
-                {
-                    using var alterCmd = connection.CreateCommand();
-                    alterCmd.CommandText = "ALTER TABLE Users ADD COLUMN Timezone TEXT NULL";
-                    alterCmd.ExecuteNonQuery();
-                    System.Diagnostics.Debug.WriteLine("✓ Repaired database: Added Timezone column to Users table.");
-                }
+                if (!languageExists) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE Users ADD COLUMN Language TEXT NULL"; c2.ExecuteNonQuery(); }
+                if (!timezoneExists) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE Users ADD COLUMN Timezone TEXT NULL"; c2.ExecuteNonQuery(); }
+                if (!firstNameExists) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE Users ADD COLUMN FirstName TEXT NOT NULL DEFAULT ''"; c2.ExecuteNonQuery(); }
+                if (!lastNameExists) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE Users ADD COLUMN LastName TEXT NOT NULL DEFAULT ''"; c2.ExecuteNonQuery(); }
+                if (!emailVerifTokenExists) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE Users ADD COLUMN EmailVerificationToken TEXT NULL"; c2.ExecuteNonQuery(); }
+                if (!emailVerifTokenExpExists) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE Users ADD COLUMN EmailVerificationTokenExpiresAt TEXT NULL"; c2.ExecuteNonQuery(); }
+                if (!passwordResetTokenExists) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE Users ADD COLUMN PasswordResetToken TEXT NULL"; c2.ExecuteNonQuery(); }
+                if (!passwordResetTokenExpExists) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE Users ADD COLUMN PasswordResetTokenExpiresAt TEXT NULL"; c2.ExecuteNonQuery(); }
+                if (!isSubscribedExists) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE Users ADD COLUMN IsSubscribed INTEGER NOT NULL DEFAULT 0"; c2.ExecuteNonQuery(); }
+                if (!subscribedUntilExists) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE Users ADD COLUMN SubscribedUntil TEXT NULL"; c2.ExecuteNonQuery(); }
+                if (!trialStartDateExists) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE Users ADD COLUMN TrialStartDate TEXT NULL"; c2.ExecuteNonQuery(); }
+                if (!trialEndDateExists) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE Users ADD COLUMN TrialEndDate TEXT NULL"; c2.ExecuteNonQuery(); }
 
                 // Check for HourlyRateGroup in TutorProfiles table
                 checkCmd.CommandText = "PRAGMA table_info(TutorProfiles)";
@@ -1219,6 +1232,31 @@ public static class DbInitializer
                     c2.ExecuteNonQuery();
                 }
 
+                // ── Create UserConsents table if missing ──────────────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='UserConsents'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS UserConsents (
+                            Id TEXT NOT NULL PRIMARY KEY,
+                            UserId TEXT NOT NULL,
+                            ConsentType INTEGER NOT NULL DEFAULT 0,
+                            Granted INTEGER NOT NULL DEFAULT 0,
+                            GrantedAt TEXT NULL,
+                            RevokedAt TEXT NULL,
+                            IpAddress TEXT NULL,
+                            UserAgent TEXT NULL,
+                            CreatedAt TEXT NOT NULL,
+                            UpdatedAt TEXT NOT NULL,
+                            CreatedBy TEXT NULL,
+                            UpdatedBy TEXT NULL,
+                            DeletedAt TEXT NULL,
+                            FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
                 // ── Create Referrals table if missing ─────────────────────────────────
                 checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='Referrals'";
                 if (checkCmd.ExecuteScalar() == null)
@@ -1261,6 +1299,21 @@ public static class DbInitializer
                             CreatedAt TEXT NOT NULL,
                             UpdatedAt TEXT NOT NULL,
                             FOREIGN KEY (TutorId) REFERENCES Users(Id) ON DELETE CASCADE
+                        )";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── Create AIResponses table if missing ───────────────────────────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='AIResponses'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS AIResponses (
+                            Id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                            Prompt TEXT NOT NULL DEFAULT '',
+                            Response TEXT NOT NULL DEFAULT '',
+                            CreatedAt TEXT NOT NULL
                         )";
                     c2.ExecuteNonQuery();
                 }
