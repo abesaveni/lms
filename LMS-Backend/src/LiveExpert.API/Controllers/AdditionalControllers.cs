@@ -333,7 +333,14 @@ public class TutorsController : ControllerBase
 
     [AllowAnonymous]
     [HttpGet]
-    public async Task<IActionResult> GetTutors([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+    public async Task<IActionResult> GetTutors(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string? search = null,
+        [FromQuery] string? subject = null,
+        [FromQuery] decimal? minRating = null,
+        [FromQuery] decimal? maxPrice = null,
+        [FromQuery] decimal? minPrice = null)
     {
         try
         {
@@ -341,6 +348,46 @@ public class TutorsController : ControllerBase
             var approvedTutors = allTutors
                 .Where(t => t.VerificationStatus == Domain.Enums.VerificationStatus.Approved)
                 .ToList();
+
+            // Apply filters
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var lower = search.ToLowerInvariant();
+                // Load user names to filter by name; filter by headline/bio/skills
+                var filtered = new List<Domain.Entities.TutorProfile>();
+                foreach (var t in approvedTutors)
+                {
+                    var u = await _userRepository.GetByIdAsync(t.UserId);
+                    if (u == null) continue;
+                    var fullName = $"{u.FirstName} {u.LastName}".ToLowerInvariant();
+                    if (fullName.Contains(lower)
+                        || (u.Username?.ToLowerInvariant().Contains(lower) ?? false)
+                        || (t.Headline?.ToLowerInvariant().Contains(lower) ?? false)
+                        || (t.Bio?.ToLowerInvariant().Contains(lower) ?? false)
+                        || (t.Skills?.ToLowerInvariant().Contains(lower) ?? false))
+                    {
+                        filtered.Add(t);
+                    }
+                }
+                approvedTutors = filtered;
+            }
+
+            if (!string.IsNullOrWhiteSpace(subject))
+            {
+                var lowerSubject = subject.ToLowerInvariant();
+                approvedTutors = approvedTutors
+                    .Where(t => t.Skills != null && t.Skills.ToLowerInvariant().Contains(lowerSubject))
+                    .ToList();
+            }
+
+            if (minRating.HasValue)
+                approvedTutors = approvedTutors.Where(t => t.AverageRating >= minRating.Value).ToList();
+
+            if (minPrice.HasValue)
+                approvedTutors = approvedTutors.Where(t => t.HourlyRate >= minPrice.Value).ToList();
+
+            if (maxPrice.HasValue)
+                approvedTutors = approvedTutors.Where(t => t.HourlyRate <= maxPrice.Value).ToList();
 
             var tutors = approvedTutors
                 .Skip((page - 1) * pageSize)
