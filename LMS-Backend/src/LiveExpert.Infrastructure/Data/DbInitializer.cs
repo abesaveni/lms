@@ -1006,6 +1006,47 @@ public static class DbInitializer
         // Ensure database is ready
         await context.Database.EnsureCreatedAsync();
 
+        // AUTO-ACCEPT all pending chat requests and create their conversations
+        try
+        {
+            var pendingRequests = await context.ChatRequests
+                .Where(r => r.Status == ChatRequestStatus.Pending)
+                .ToListAsync();
+
+            foreach (var req in pendingRequests)
+            {
+                req.Status = ChatRequestStatus.Accepted;
+                req.LastActionAt = DateTime.UtcNow;
+                context.ChatRequests.Update(req);
+
+                var conversationExists = await context.Conversations
+                    .AnyAsync(c => (c.User1Id == req.StudentId && c.User2Id == req.TutorId) ||
+                                   (c.User1Id == req.TutorId && c.User2Id == req.StudentId));
+
+                if (!conversationExists)
+                {
+                    context.Conversations.Add(new Conversation
+                    {
+                        Id = Guid.NewGuid(),
+                        User1Id = req.StudentId,
+                        User2Id = req.TutorId,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    });
+                }
+            }
+
+            if (pendingRequests.Any())
+            {
+                await context.SaveChangesAsync();
+                System.Diagnostics.Debug.WriteLine($"✓ Auto-accepted {pendingRequests.Count} pending chat request(s).");
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"⚠ Auto-accept chat requests failed: {ex.Message}");
+        }
+
         // CREATE HARDCODED SUPER ADMIN (CANNOT BE CHANGED)
         var superAdmin = await context.Users.FirstOrDefaultAsync(u => u.Email == SUPER_ADMIN_EMAIL);
         if (superAdmin == null)

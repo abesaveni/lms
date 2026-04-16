@@ -92,7 +92,7 @@ const StudentInbox = () => {
         setConversations(transformedConversations)
         
         // Auto-select first conversation if available
-        if (transformedConversations.length > 0 && !selectedConversation) {
+        if (transformedConversations.length > 0) {
           setSelectedConversation(transformedConversations[0].id)
         }
       } catch (err: any) {
@@ -120,6 +120,11 @@ const StudentInbox = () => {
           conversationId: request.conversationId,
         }))
         setChatRequests(transformed)
+        // Auto-open the first accepted conversation if none is selected
+        const firstAccepted = transformed.find(r => r.status === 'Accepted' && r.conversationId)
+        if (firstAccepted?.conversationId) {
+          setSelectedConversation(prev => prev ?? firstAccepted.conversationId!)
+        }
       } catch (err: any) {
         console.error('Failed to load chat requests:', err)
       } finally {

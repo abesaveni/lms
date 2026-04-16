@@ -65,7 +65,7 @@ public class ChatRequestsController : ControllerBase
         ChatRequest chatRequest;
         if (existing != null)
         {
-            existing.Status = ChatRequestStatus.Pending;
+            existing.Status = ChatRequestStatus.Accepted;
             existing.LastActionById = studentId.Value;
             existing.LastActionAt = DateTime.UtcNow;
             await _chatRequestRepository.UpdateAsync(existing);
@@ -78,19 +78,37 @@ public class ChatRequestsController : ControllerBase
                 Id = Guid.NewGuid(),
                 StudentId = studentId.Value,
                 TutorId = request.TutorId,
-                Status = ChatRequestStatus.Pending,
+                Status = ChatRequestStatus.Accepted,
                 LastActionById = studentId.Value,
                 LastActionAt = DateTime.UtcNow
             };
             await _chatRequestRepository.AddAsync(chatRequest);
         }
 
+        // Auto-create the conversation so the student can message immediately
+        var existingConversation = await _conversationRepository.FirstOrDefaultAsync(
+            c => (c.User1Id == studentId.Value && c.User2Id == request.TutorId) ||
+                 (c.User1Id == request.TutorId && c.User2Id == studentId.Value));
+
+        if (existingConversation == null)
+        {
+            var conversation = new Conversation
+            {
+                Id = Guid.NewGuid(),
+                User1Id = studentId.Value,
+                User2Id = request.TutorId,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            await _conversationRepository.AddAsync(conversation);
+        }
+
         await _unitOfWork.SaveChangesAsync();
 
         await _notificationService.SendNotificationAsync(
             tutor.Id,
-            "New Chat Request",
-            "A student has requested to chat with you.",
+            "New Message Request",
+            "A student has started a conversation with you.",
             NotificationType.NewMessage,
             "/tutor/inbox");
 
