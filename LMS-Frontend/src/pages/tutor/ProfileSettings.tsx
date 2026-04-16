@@ -380,6 +380,7 @@ const TutorProfileSettings = () => {
                       type="number"
                       value={formData.hourlyRate1on1}
                       onChange={(e) => setFormData({ ...formData, hourlyRate1on1: Number(e.target.value) })}
+                      onFocus={(e) => e.target.select()}
                       className="pl-8"
                       min="0"
                     />
@@ -396,6 +397,7 @@ const TutorProfileSettings = () => {
                       type="number"
                       value={formData.hourlyRateGroup}
                       onChange={(e) => setFormData({ ...formData, hourlyRateGroup: Number(e.target.value) })}
+                      onFocus={(e) => e.target.select()}
                       className="pl-8"
                       min="0"
                     />

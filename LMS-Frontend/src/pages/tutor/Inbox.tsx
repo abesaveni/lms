@@ -212,12 +212,12 @@ const TutorInbox = () => {
               content: message.content,
               senderId: message.senderId,
               senderName: message.senderId === currentUserId ? 'You' : (message.senderName || 'User'),
-              timestamp: new Date(message.createdAt || message.timestamp),
+              timestamp: new Date(),
               isRead: false,
             },
           ]
         })
-        
+
         // Update conversation's last message
         setConversations((prev) =>
           prev.map((conv) =>
@@ -225,7 +225,7 @@ const TutorInbox = () => {
               ? {
                   ...conv,
                   lastMessage: message.content,
-                  lastMessageTime: new Date(message.createdAt || message.timestamp),
+                  lastMessageTime: new Date(),
                   unreadCount: message.senderId === currentUserId ? conv.unreadCount : conv.unreadCount + 1,
                 }
               : conv
@@ -275,13 +275,14 @@ const TutorInbox = () => {
         setError(null)
         const response = await getMessages(selectedConversation, { page: 1, pageSize: 100 })
         
+        const parseUtc = (s: string) => new Date(s.endsWith('Z') ? s : s + 'Z')
         // Transform API response to component format
         const transformedMessages: Message[] = response.items.map((msg: MessageDto) => ({
           id: msg.id,
           content: msg.content,
           senderId: msg.senderId,
           senderName: msg.senderId === currentUserId ? 'You' : (msg.senderName || 'User'),
-          timestamp: new Date(msg.createdAt),
+          timestamp: msg.createdAt ? parseUtc(msg.createdAt) : new Date(),
           isRead: msg.isRead,
         }))
         

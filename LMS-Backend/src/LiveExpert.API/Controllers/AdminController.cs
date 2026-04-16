@@ -424,7 +424,8 @@ public class AdminController : BaseController
 
                 // Sessions & Bookings
                 var userSessionIds = await _context.Sessions.Where(s => s.TutorId == userId).Select(s => s.Id).ToListAsync();
-                _context.SessionBookings.RemoveRange(_context.SessionBookings.Where(b => b.StudentId == userId || userSessionIds.Contains(b.SessionId)));
+                // Use ExecuteDeleteAsync to generate direct DELETE SQL (avoids SELECT with missing columns like CurrentLevel)
+                await _context.SessionBookings.Where(b => b.StudentId == userId || userSessionIds.Contains(b.SessionId)).ExecuteDeleteAsync();
                 _context.SessionMeetLinks.RemoveRange(_context.SessionMeetLinks.Where(l => userSessionIds.Contains(l.SessionId)));
                 _context.VirtualClassroomSessions.RemoveRange(_context.VirtualClassroomSessions.Where(v => v.TutorId == userId));
                 _context.Sessions.RemoveRange(_context.Sessions.Where(s => s.TutorId == userId));
@@ -579,7 +580,9 @@ public class AdminController : BaseController
         try
         {
             var allPayments = await _paymentRepository.GetAllAsync();
-            var allSessionBookings = await _sessionBookingRepository.GetAllAsync();
+            IEnumerable<LiveExpert.Domain.Entities.SessionBooking> allSessionBookings;
+            try { allSessionBookings = await _sessionBookingRepository.GetAllAsync(); }
+            catch { allSessionBookings = Enumerable.Empty<LiveExpert.Domain.Entities.SessionBooking>(); }
             var allWithdrawals = await _withdrawalRepository.GetAllAsync();
 
             // Calculate totals

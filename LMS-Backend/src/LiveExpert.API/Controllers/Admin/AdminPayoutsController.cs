@@ -136,13 +136,13 @@ public class AdminPayoutsController : ControllerBase
                 p.ProcessedAt,
                 p.AdminNotes,
                 p.TransactionReference,
-                BankAccount = new
+                BankAccount = p.BankAccount != null ? new
                 {
                     p.BankAccount.AccountHolderName,
                     p.BankAccount.BankName,
                     p.BankAccount.IFSCCode,
                     AccountNumber = _encryptionService.Decrypt(p.BankAccount.AccountNumber)
-                }
+                } : null
             })
             .ToListAsync();
 
@@ -167,11 +167,11 @@ public class AdminPayoutsController : ControllerBase
         {
             Id = p.Id,
             TutorId = p.TutorId,
-            TutorName = $"{p.Tutor.FirstName} {p.Tutor.LastName}",
-            TutorEmail = p.Tutor.Email,
+            TutorName = $"{p.Tutor?.FirstName} {p.Tutor?.LastName}".Trim(),
+            TutorEmail = p.Tutor?.Email ?? "",
             Amount = p.Amount,
             RequestedAt = p.RequestedAt,
-            BankAccount = new BankAccountDetailsDto
+            BankAccount = p.BankAccount != null ? new BankAccountDetailsDto
             {
                 AccountHolderName = p.BankAccount.AccountHolderName,
                 AccountNumber = _encryptionService.Decrypt(p.BankAccount.AccountNumber),
@@ -179,7 +179,7 @@ public class AdminPayoutsController : ControllerBase
                 IFSCCode = p.BankAccount.IFSCCode,
                 BranchName = p.BankAccount.BranchName,
                 AccountType = p.BankAccount.AccountType.ToString(),
-            },
+            } : new BankAccountDetailsDto { AccountHolderName = "N/A", BankName = "N/A", IFSCCode = "N/A" },
             EarningsHistory = _context.TutorEarnings
                 .Where(e => e.TutorId == p.TutorId)
                 .OrderByDescending(e => e.CreatedAt)

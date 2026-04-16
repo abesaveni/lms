@@ -545,17 +545,22 @@ public static class DbInitializer
                 }
                 else
                 {
-                    // TutorEarnings exists — ensure BookingId column is present
+                    // TutorEarnings exists — ensure all new columns are present
                     checkCmd.CommandText = "PRAGMA table_info(TutorEarnings)";
-                    bool teBookingId = false;
+                    bool teBookingId = false, tePayoutRequestId = false, tePaidAt = false;
                     using (var teReader = checkCmd.ExecuteReader())
                     {
                         while (teReader.Read())
                         {
-                            if (teReader["name"].ToString() == "BookingId") { teBookingId = true; break; }
+                            var col = teReader["name"].ToString();
+                            if (col == "BookingId") teBookingId = true;
+                            if (col == "PayoutRequestId") tePayoutRequestId = true;
+                            if (col == "PaidAt") tePaidAt = true;
                         }
                     }
                     if (!teBookingId) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorEarnings ADD COLUMN BookingId TEXT NULL"; c2.ExecuteNonQuery(); }
+                    if (!tePayoutRequestId) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorEarnings ADD COLUMN PayoutRequestId TEXT NULL"; c2.ExecuteNonQuery(); }
+                    if (!tePaidAt) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE TutorEarnings ADD COLUMN PaidAt TEXT NULL"; c2.ExecuteNonQuery(); }
                 }
 
                 // ── Create PlatformFeePayments table if missing ───────────────────────
@@ -1023,47 +1028,6 @@ public static class DbInitializer
         // Ensure database is ready
         await context.Database.EnsureCreatedAsync();
 
-        // AUTO-ACCEPT all pending chat requests and create their conversations
-        try
-        {
-            var pendingRequests = await context.ChatRequests
-                .Where(r => r.Status == ChatRequestStatus.Pending)
-                .ToListAsync();
-
-            foreach (var req in pendingRequests)
-            {
-                req.Status = ChatRequestStatus.Accepted;
-                req.LastActionAt = DateTime.UtcNow;
-                context.ChatRequests.Update(req);
-
-                var conversationExists = await context.Conversations
-                    .AnyAsync(c => (c.User1Id == req.StudentId && c.User2Id == req.TutorId) ||
-                                   (c.User1Id == req.TutorId && c.User2Id == req.StudentId));
-
-                if (!conversationExists)
-                {
-                    context.Conversations.Add(new Conversation
-                    {
-                        Id = Guid.NewGuid(),
-                        User1Id = req.StudentId,
-                        User2Id = req.TutorId,
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow
-                    });
-                }
-            }
-
-            if (pendingRequests.Any())
-            {
-                await context.SaveChangesAsync();
-                System.Diagnostics.Debug.WriteLine($"✓ Auto-accepted {pendingRequests.Count} pending chat request(s).");
-            }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"⚠ Auto-accept chat requests failed: {ex.Message}");
-        }
-
         // CREATE HARDCODED SUPER ADMIN (CANNOT BE CHANGED)
         var superAdmin = await context.Users.FirstOrDefaultAsync(u => u.Email == SUPER_ADMIN_EMAIL);
         if (superAdmin == null)
@@ -1159,6 +1123,37 @@ public static class DbInitializer
             context.Subjects.AddRange(newSubjects);
             await context.SaveChangesAsync();
             System.Diagnostics.Debug.WriteLine($"✓ Seeded {newSubjects.Count} subjects (total now: {existingSlugs.Count + newSubjects.Count}).");
+        }
+
+        // Seed blog / FAQ categories if none exist
+        if (!context.Categories.Any())
+        {
+            var defaultCategories = new[]
+            {
+                ("Education & Learning", "education-learning", 1),
+                ("Technology & Programming", "technology-programming", 2),
+                ("Career & Jobs", "career-jobs", 3),
+                ("Science & Mathematics", "science-mathematics", 4),
+                ("Language & Communication", "language-communication", 5),
+                ("Tips & Study Guides", "tips-study-guides", 6),
+                ("News & Updates", "news-updates", 7),
+                ("Student Life", "student-life", 8),
+            };
+            foreach (var (name, slug, order) in defaultCategories)
+            {
+                context.Categories.Add(new Category
+                {
+                    Id = Guid.NewGuid(),
+                    Name = name,
+                    Slug = slug,
+                    IsActive = true,
+                    DisplayOrder = order,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                });
+            }
+            await context.SaveChangesAsync();
+            System.Diagnostics.Debug.WriteLine("✓ Seeded default blog categories.");
         }
 
         await context.SaveChangesAsync();

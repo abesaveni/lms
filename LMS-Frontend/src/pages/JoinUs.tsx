@@ -35,14 +35,13 @@ const JoinUs = () => {
               Join as a tutor and share your expertise with students worldwide. Build your teaching
               career with flexible scheduling and competitive earnings.
             </p>
-            <Button
-              variant="outline"
-              className="bg-gray-900 text-white hover:bg-gray-800 border-gray-900"
+            <button
+              className="inline-flex items-center justify-center rounded-lg font-medium transition-all duration-200 px-4 py-2 text-base bg-gray-900 text-white hover:bg-gray-800 border-2 border-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
               onClick={() => navigate('/register?role=tutor')}
             >
               Continue as Tutor
               <ArrowRight className="ml-2 w-5 h-5" />
-            </Button>
+            </button>
           </Card>
 
           <Card hover className="p-8 bg-gradient-primary text-white">
