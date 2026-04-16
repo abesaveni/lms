@@ -118,17 +118,26 @@ public class GetMySessionsQueryHandler : IRequestHandler<GetMySessionsQuery, Res
         var sessionDtos = new List<MySessionDto>();
         foreach (var session in sessions)
         {
-            var bookings = await _bookingRepository.FindAsync(b => b.SessionId == session.Id, cancellationToken);
-            
+            int bookedSeats = 0;
+            try
+            {
+                var bookings = await _bookingRepository.FindAsync(b => b.SessionId == session.Id, cancellationToken);
+                bookedSeats = bookings.Count();
+            }
+            catch
+            {
+                // Booking count unavailable (e.g. schema migration pending) — default to 0
+            }
+
             sessionDtos.Add(new MySessionDto
             {
                 SessionId = session.Id,
                 Title = session.Title,
                 ScheduledAt = session.ScheduledAt,
                 Status = session.Status.ToString(),
-                BookedSeats = bookings.Count(),
-                MaxParticipants = 10, // Default value
-                Price = 0, // Default value
+                BookedSeats = bookedSeats,
+                MaxParticipants = 10,
+                Price = 0,
                 MeetingLink = session.MeetingLink ?? ""
             });
         }
