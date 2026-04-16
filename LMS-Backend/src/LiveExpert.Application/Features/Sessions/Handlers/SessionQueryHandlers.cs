@@ -18,6 +18,7 @@ public class GetSessionsQueryHandler : IRequestHandler<GetSessionsQuery, Result<
     private readonly IRepository<Review> _reviewRepository;
     private readonly ICurrentUserService _currentUserService;
     private readonly IEncryptionService _encryptionService;
+    private readonly IUnitOfWork _unitOfWork;
 
     public GetSessionsQueryHandler(
         IRepository<Session> sessionRepository,
@@ -26,7 +27,8 @@ public class GetSessionsQueryHandler : IRequestHandler<GetSessionsQuery, Result<
         IRepository<SessionBooking> bookingRepository,
         IRepository<Review> reviewRepository,
         ICurrentUserService currentUserService,
-        IEncryptionService encryptionService)
+        IEncryptionService encryptionService,
+        IUnitOfWork unitOfWork)
     {
         _sessionRepository = sessionRepository;
         _userRepository = userRepository;
@@ -35,6 +37,7 @@ public class GetSessionsQueryHandler : IRequestHandler<GetSessionsQuery, Result<
         _reviewRepository = reviewRepository;
         _currentUserService = currentUserService;
         _encryptionService = encryptionService;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<PaginatedResult<SessionDto>>> Handle(GetSessionsQuery request, CancellationToken cancellationToken)
@@ -71,6 +74,9 @@ public class GetSessionsQueryHandler : IRequestHandler<GetSessionsQuery, Result<
                     }
                 }
             }
+            // Persist the status updates
+            try { await _unitOfWork.SaveChangesAsync(cancellationToken); } catch { /* non-critical — updates visible in this request via tracker */ }
+
             // Re-query after updates
             query = _sessionRepository.GetQueryable()
                 .Include(s => s.MeetLink);
@@ -97,7 +103,7 @@ public class GetSessionsQueryHandler : IRequestHandler<GetSessionsQuery, Result<
 
         if (request.Upcoming == true)
         {
-            query = query.Where(s => s.ScheduledAt > now);
+            query = query.Where(s => s.ScheduledAt > now && s.Status != SessionStatus.Cancelled && s.Status != SessionStatus.Completed);
         }
 
         if (request.Past == true)

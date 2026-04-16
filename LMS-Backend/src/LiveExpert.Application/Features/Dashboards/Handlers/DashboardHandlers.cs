@@ -16,6 +16,7 @@ public class GetStudentDashboardQueryHandler : IRequestHandler<GetStudentDashboa
     private readonly IRepository<BonusPoint> _bonusPointRepository;
     private readonly IRepository<User> _userRepository;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IUnitOfWork _unitOfWork;
 
     public GetStudentDashboardQueryHandler(
         IRepository<SessionBooking> bookingRepository,
@@ -23,7 +24,8 @@ public class GetStudentDashboardQueryHandler : IRequestHandler<GetStudentDashboa
         IRepository<Subject> subjectRepository,
         IRepository<BonusPoint> bonusPointRepository,
         IRepository<User> userRepository,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IUnitOfWork unitOfWork)
     {
         _bookingRepository = bookingRepository;
         _sessionRepository = sessionRepository;
@@ -31,6 +33,7 @@ public class GetStudentDashboardQueryHandler : IRequestHandler<GetStudentDashboa
         _bonusPointRepository = bonusPointRepository;
         _userRepository = userRepository;
         _currentUserService = currentUserService;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<StudentDashboardDto>> Handle(GetStudentDashboardQuery request, CancellationToken cancellationToken)
@@ -63,6 +66,9 @@ public class GetStudentDashboardQueryHandler : IRequestHandler<GetStudentDashboa
                 }
             }
         }
+
+        // Persist session/booking status updates
+        try { await _unitOfWork.SaveChangesAsync(cancellationToken); } catch { /* non-critical */ }
 
         // Re-fetch bookings after updates to ensure consistency
         bookings = await _bookingRepository.FindAsync(b => b.StudentId == userId.Value, cancellationToken);
@@ -186,6 +192,7 @@ public class GetTutorDashboardQueryHandler : IRequestHandler<GetTutorDashboardQu
     private readonly IRepository<User> _userRepository;
     private readonly IRepository<TutorFollower> _followerRepository;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IUnitOfWork _unitOfWork;
 
     public GetTutorDashboardQueryHandler(
         IRepository<Session> sessionRepository,
@@ -194,7 +201,8 @@ public class GetTutorDashboardQueryHandler : IRequestHandler<GetTutorDashboardQu
         IRepository<TutorProfile> tutorProfileRepository,
         IRepository<User> userRepository,
         IRepository<TutorFollower> followerRepository,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IUnitOfWork unitOfWork)
     {
         _sessionRepository = sessionRepository;
         _bookingRepository = bookingRepository;
@@ -203,6 +211,7 @@ public class GetTutorDashboardQueryHandler : IRequestHandler<GetTutorDashboardQu
         _userRepository = userRepository;
         _followerRepository = followerRepository;
         _currentUserService = currentUserService;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<TutorDashboardDto>> Handle(GetTutorDashboardQuery request, CancellationToken cancellationToken)
@@ -240,6 +249,9 @@ public class GetTutorDashboardQueryHandler : IRequestHandler<GetTutorDashboardQu
                 }
             }
         }
+
+        // Persist session/booking status updates
+        try { await _unitOfWork.SaveChangesAsync(cancellationToken); } catch { /* non-critical */ }
 
         // Re-fetch sessions after updates
         sessions = await _sessionRepository.FindAsync(s => s.TutorId == userId.Value, cancellationToken);

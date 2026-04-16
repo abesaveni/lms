@@ -173,10 +173,18 @@ public class BookSessionCommandHandler : IRequestHandler<BookSessionCommand, Res
                 ? session.BasePrice * (hoursBooked ?? 0)
                 : session.BasePrice;
 
+            // Apply flash sale price FIRST, before calculating discounts and total
+            if (session.FlashSalePrice.HasValue && session.FlashSaleEndsAt.HasValue && session.FlashSaleEndsAt.Value > DateTime.UtcNow)
+            {
+                baseAmount = session.PricingType == SessionPricingType.Hourly
+                    ? session.FlashSalePrice.Value * (hoursBooked ?? 0)
+                    : session.FlashSalePrice.Value;
+            }
+
             var platformFee = 0m;
             var bookingCount = await _bookingRepository.CountAsync(b => b.StudentId == userId.Value, cancellationToken);
             var isFirstBooking = bookingCount == 0;
-            
+
             var platformFeeEnabled = await _settingsService.IsPlatformFeeEnabledAsync();
             if (platformFeeEnabled && isFirstBooking)
             {
@@ -242,14 +250,6 @@ public class BookSessionCommandHandler : IRequestHandler<BookSessionCommand, Res
             }
 
             var totalAmount = baseAmount + platformFee - pointsDiscount - couponDiscount;
-
-            // Feature: Apply flash sale price if active
-            if (session.FlashSalePrice.HasValue && session.FlashSaleEndsAt.HasValue && session.FlashSaleEndsAt.Value > DateTime.UtcNow)
-            {
-                baseAmount = session.PricingType == SessionPricingType.Hourly
-                    ? session.FlashSalePrice.Value * (hoursBooked ?? 0)
-                    : session.FlashSalePrice.Value;
-            }
 
             // Feature: Instant Booking — auto-confirm without tutor approval
             var initialStatus = session.InstantBooking ? BookingStatus.Confirmed : BookingStatus.Pending;
