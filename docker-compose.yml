@@ -16,6 +16,7 @@ services:
     volumes:
       - backend-data:/app/data      # SQLite database persistence
       - backend-logs:/app/logs
+      - backend-uploads:/app/wwwroot/uploads  # Uploaded profile photos & documents
     expose:
       - "8080"
     networks:
@@ -74,6 +75,7 @@ services:
 volumes:
   backend-data:
   backend-logs:
+  backend-uploads:
   certbot-www:
   certbot-conf:
 

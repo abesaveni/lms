@@ -26,7 +26,7 @@ RUN groupadd --system appgroup && useradd --system --gid appgroup appuser
 COPY --from=build /app/publish .
 
 # Data directory for SQLite DB (mounted as volume in production)
-RUN mkdir -p /app/data /app/logs && chown -R appuser:appgroup /app
+RUN mkdir -p /app/data /app/logs /app/wwwroot/uploads && chown -R appuser:appgroup /app
 
 USER appuser
 
