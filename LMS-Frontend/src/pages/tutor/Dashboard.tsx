@@ -76,13 +76,11 @@ const TutorDashboard = () => {
       }
     }
 
-    // Only fetch if calendar is connected or if admin (skip calendar check)
-    if (!isLoading && (isCalendarConnected || isAdmin())) {
+    // Sessions use Jitsi — no Google Calendar required, always load when profile is ready
+    if (!isLoading) {
       fetchDashboardSessions();
-    } else if (isCalendarConnected === false) {
-      setIsSessionsLoading(false);
     }
-  }, [isLoading, isCalendarConnected]);
+  }, [isLoading]);
 
   if (isLoading) {
     return (
@@ -185,7 +183,7 @@ const TutorDashboard = () => {
               <motion.div
                 animate={{ rotate: [0, 5, -5, 0] }}
                 transition={{ duration: 3, repeat: Infinity, repeatDelay: 2 }}
-                className="hidden md:block w-32 h-32 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center"
+                className="hidden md:flex w-32 h-32 rounded-full bg-white/20 backdrop-blur-sm items-center justify-center"
               >
                 <Video className="w-16 h-16" />
               </motion.div>

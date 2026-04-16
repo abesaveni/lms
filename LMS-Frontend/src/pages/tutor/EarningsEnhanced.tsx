@@ -72,20 +72,31 @@ const TutorEarningsEnhanced = () => {
 
   const fetchAll = async () => {
     setLoading(true)
+    setError(null)
     try {
-      const [w, h, b, p] = await Promise.all([
+      const [w, h, b, p] = await Promise.allSettled([
         apiGet<WalletSummary>('/tutor/payouts/wallet'),
         apiGet<{ data: EarningHistoryItem[] }>('/tutor/earnings/history'),
         getBankAccounts(),
         getPayoutHistory(),
       ])
-      setWallet(w)
-      setHistory(h.data || [])
-      setBankAccounts(b || [])
-      setPayouts(p || [])
-      if (b.length > 0) {
-        const primary = b.find((a: any) => a.isPrimary) || b[0]
-        setSelectedBank(primary.id)
+      if (w.status === 'fulfilled') setWallet(w.value)
+      if (h.status === 'fulfilled') setHistory((h.value as any).data || [])
+      if (b.status === 'fulfilled') {
+        const accounts = b.value || []
+        setBankAccounts(accounts)
+        if (accounts.length > 0) {
+          const primary = accounts.find((a: any) => a.isPrimary) || accounts[0]
+          setSelectedBank(primary.id)
+        }
+      }
+      if (p.status === 'fulfilled') setPayouts(p.value || [])
+
+      // Only show error if ALL calls failed
+      const allFailed = [w, h, b, p].every(r => r.status === 'rejected')
+      if (allFailed) {
+        const firstError = [w, h, b, p].find(r => r.status === 'rejected') as PromiseRejectedResult
+        setError(firstError?.reason?.message || 'Failed to load earnings data')
       }
     } catch (e: any) {
       setError(e.message || 'Failed to load earnings')

@@ -253,12 +253,12 @@ public class TutorPayoutsController : ControllerBase
             RequestedAt = p.RequestedAt,
             ProcessedAt = p.ProcessedAt,
             AdminNotes = p.AdminNotes,
-            BankAccount = new BankAccountSummaryDto
+            BankAccount = p.BankAccount != null ? new BankAccountSummaryDto
             {
                 AccountHolderName = p.BankAccount.AccountHolderName,
                 BankName = p.BankAccount.BankName,
                 AccountNumber = "****XXXX", // Masked
-            },
+            } : null,
         }).ToList();
 
         return Ok(Result<List<PayoutRequestDto>>.SuccessResult(payoutDtos));
