@@ -19,7 +19,6 @@ const TutorDashboard = () => {
   const [totalStudents, setTotalStudents] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [isSessionsLoading, setIsSessionsLoading] = useState(true)
-  const [isCalendarConnected, setIsCalendarConnected] = useState<boolean | null>(null)
 
   const user = getCurrentUser()
   const userName = profile?.firstName || user?.username || 'there'
@@ -33,11 +32,10 @@ const TutorDashboard = () => {
       }
 
       try {
-        const [profileData, earningsData, dashboardStats, { checkCalendarConnection: checkConnection }] = await Promise.all([
+        const [profileData, earningsData, dashboardStats] = await Promise.all([
           getTutorProfile(),
           getEarningsOverview(),
           getTutorDashboardStats(),
-          import('../../services/calendarApi')
         ])
 
         setProfile(profileData)
@@ -49,9 +47,6 @@ const TutorDashboard = () => {
           navigate('/tutor/verification-pending')
           return
         }
-
-        const connected = await checkConnection()
-        setIsCalendarConnected(connected)
       } catch (error) {
         console.error('Error fetching dashboard data:', error)
       } finally {
