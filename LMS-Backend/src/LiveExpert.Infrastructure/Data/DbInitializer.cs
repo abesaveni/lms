@@ -216,6 +216,128 @@ public static class DbInitializer
                     System.Diagnostics.Debug.WriteLine("✓ Repaired database: Created SessionMeetLinks table.");
                 }
 
+                // ── Sessions: BasePrice + PricingType (UpdatePaymentsAndBonusPoints Jan-2026) ─
+                checkCmd.CommandText = "PRAGMA table_info(Sessions)";
+                bool basePriceExists = false, pricingTypeExists = false;
+                using (var sessReader0 = checkCmd.ExecuteReader())
+                {
+                    while (sessReader0.Read())
+                    {
+                        var col = sessReader0["name"].ToString();
+                        if (col == "BasePrice") basePriceExists = true;
+                        if (col == "PricingType") pricingTypeExists = true;
+                    }
+                }
+                if (!basePriceExists) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE Sessions ADD COLUMN BasePrice TEXT NOT NULL DEFAULT '0'"; c2.ExecuteNonQuery(); }
+                if (!pricingTypeExists) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE Sessions ADD COLUMN PricingType INTEGER NOT NULL DEFAULT 0"; c2.ExecuteNonQuery(); }
+
+                // ── SessionBookings: BaseAmount + HoursBooked + PlatformFee (Jan-2026) ─────
+                checkCmd.CommandText = "PRAGMA table_info(SessionBookings)";
+                bool sbBaseAmount = false, sbHoursBooked = false, sbPlatformFee = false, sbTotalAmount = false;
+                using (var sbReader0 = checkCmd.ExecuteReader())
+                {
+                    while (sbReader0.Read())
+                    {
+                        var col = sbReader0["name"].ToString();
+                        if (col == "BaseAmount") sbBaseAmount = true;
+                        if (col == "HoursBooked") sbHoursBooked = true;
+                        if (col == "PlatformFee") sbPlatformFee = true;
+                        if (col == "TotalAmount") sbTotalAmount = true;
+                    }
+                }
+                if (!sbBaseAmount) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE SessionBookings ADD COLUMN BaseAmount TEXT NOT NULL DEFAULT '0'"; c2.ExecuteNonQuery(); }
+                if (!sbHoursBooked) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE SessionBookings ADD COLUMN HoursBooked INTEGER NULL"; c2.ExecuteNonQuery(); }
+                if (!sbPlatformFee) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE SessionBookings ADD COLUMN PlatformFee TEXT NOT NULL DEFAULT '0'"; c2.ExecuteNonQuery(); }
+                // TotalAmount is a rename of CreditsCharged — add if neither exists
+                if (!sbTotalAmount) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE SessionBookings ADD COLUMN TotalAmount TEXT NOT NULL DEFAULT '0'"; c2.ExecuteNonQuery(); }
+
+                // ── Create BonusPoints table if missing (UpdatePaymentsAndBonusPoints Jan-2026) ─
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='BonusPoints'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"CREATE TABLE IF NOT EXISTS BonusPoints (
+                        Id TEXT NOT NULL PRIMARY KEY,
+                        UserId TEXT NOT NULL,
+                        Points INTEGER NOT NULL DEFAULT 0,
+                        Reason INTEGER NOT NULL DEFAULT 0,
+                        ReferenceId TEXT NULL,
+                        CreatedAt TEXT NOT NULL,
+                        UpdatedAt TEXT NOT NULL,
+                        FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE)";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── Create ChatRequests table if missing (UpdatePaymentsAndBonusPoints Jan-2026) ─
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='ChatRequests'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"CREATE TABLE IF NOT EXISTS ChatRequests (
+                        Id TEXT NOT NULL PRIMARY KEY,
+                        StudentId TEXT NOT NULL,
+                        TutorId TEXT NOT NULL,
+                        Status INTEGER NOT NULL DEFAULT 0,
+                        LastActionById TEXT NULL,
+                        LastActionAt TEXT NULL,
+                        CreatedAt TEXT NOT NULL,
+                        UpdatedAt TEXT NOT NULL,
+                        FOREIGN KEY (StudentId) REFERENCES Users(Id) ON DELETE CASCADE,
+                        FOREIGN KEY (TutorId) REFERENCES Users(Id) ON DELETE CASCADE)";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── Create TutorFollowers table if missing (UpdatePaymentsAndBonusPoints Jan-2026) ─
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='TutorFollowers'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"CREATE TABLE IF NOT EXISTS TutorFollowers (
+                        Id TEXT NOT NULL PRIMARY KEY,
+                        TutorId TEXT NOT NULL,
+                        StudentId TEXT NOT NULL,
+                        CreatedAt TEXT NOT NULL,
+                        UpdatedAt TEXT NOT NULL,
+                        FOREIGN KEY (TutorId) REFERENCES Users(Id) ON DELETE CASCADE,
+                        FOREIGN KEY (StudentId) REFERENCES Users(Id) ON DELETE CASCADE)";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── Create UserNotificationPreferences table if missing (Jan-2026) ─────────
+                checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='UserNotificationPreferences'";
+                if (checkCmd.ExecuteScalar() == null)
+                {
+                    using var c2 = connection.CreateCommand();
+                    c2.CommandText = @"CREATE TABLE IF NOT EXISTS UserNotificationPreferences (
+                        Id TEXT NOT NULL PRIMARY KEY,
+                        UserId TEXT NOT NULL,
+                        Category INTEGER NOT NULL DEFAULT 0,
+                        EmailEnabled INTEGER NOT NULL DEFAULT 1,
+                        WhatsAppEnabled INTEGER NOT NULL DEFAULT 0,
+                        InAppEnabled INTEGER NOT NULL DEFAULT 1,
+                        CreatedAt TEXT NOT NULL,
+                        UpdatedAt TEXT NOT NULL,
+                        FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE)";
+                    c2.ExecuteNonQuery();
+                }
+
+                // ── ReferralPrograms: JoiningBonusAmount + JoiningBonusPaidAt + ReferralBonusPaidAt (Jan-2026) ─
+                checkCmd.CommandText = "PRAGMA table_info(ReferralPrograms)";
+                bool rpJoiningBonus = false, rpJoiningBonusPaidAt = false, rpReferralBonusPaidAt = false;
+                using (var rpReader0 = checkCmd.ExecuteReader())
+                {
+                    while (rpReader0.Read())
+                    {
+                        var col = rpReader0["name"].ToString();
+                        if (col == "JoiningBonusAmount") rpJoiningBonus = true;
+                        if (col == "JoiningBonusPaidAt") rpJoiningBonusPaidAt = true;
+                        if (col == "ReferralBonusPaidAt") rpReferralBonusPaidAt = true;
+                    }
+                }
+                if (!rpJoiningBonus) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE ReferralPrograms ADD COLUMN JoiningBonusAmount TEXT NOT NULL DEFAULT '0'"; c2.ExecuteNonQuery(); }
+                if (!rpJoiningBonusPaidAt) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE ReferralPrograms ADD COLUMN JoiningBonusPaidAt TEXT NULL"; c2.ExecuteNonQuery(); }
+                if (!rpReferralBonusPaidAt) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE ReferralPrograms ADD COLUMN ReferralBonusPaidAt TEXT NULL"; c2.ExecuteNonQuery(); }
+
                 // ── Flash Sale + Instant Booking + No-Show + RequiresSubscription on Sessions ──
                 checkCmd.CommandText = "PRAGMA table_info(Sessions)";
                 bool flashSalePriceExists = false, flashSaleEndsAtExists = false;
