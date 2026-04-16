@@ -12,6 +12,7 @@ public class SubmitReviewCommandHandler : IRequestHandler<SubmitReviewCommand, R
 {
     private readonly IRepository<Review> _reviewRepository;
     private readonly IRepository<SessionBooking> _bookingRepository;
+    private readonly IRepository<Session> _sessionRepository;
     private readonly IRepository<TutorProfile> _tutorRepository;
     private readonly IRepository<User> _userRepository;
     private readonly ICurrentUserService _currentUserService;
@@ -21,6 +22,7 @@ public class SubmitReviewCommandHandler : IRequestHandler<SubmitReviewCommand, R
     public SubmitReviewCommandHandler(
         IRepository<Review> reviewRepository,
         IRepository<SessionBooking> bookingRepository,
+        IRepository<Session> sessionRepository,
         IRepository<TutorProfile> tutorRepository,
         IRepository<User> userRepository,
         ICurrentUserService currentUserService,
@@ -29,6 +31,7 @@ public class SubmitReviewCommandHandler : IRequestHandler<SubmitReviewCommand, R
     {
         _reviewRepository = reviewRepository;
         _bookingRepository = bookingRepository;
+        _sessionRepository = sessionRepository;
         _tutorRepository = tutorRepository;
         _userRepository = userRepository;
         _currentUserService = currentUserService;
@@ -56,6 +59,15 @@ public class SubmitReviewCommandHandler : IRequestHandler<SubmitReviewCommand, R
 
         if (!booking.AttendanceMarked)
             return Result<Guid>.FailureResult("INVALID_STATUS", "Can only review sessions you attended");
+
+        // Resolve TutorId from the session when not provided by the client
+        if (request.TutorId == Guid.Empty)
+        {
+            var session = await _sessionRepository.GetByIdAsync(request.SessionId, cancellationToken);
+            if (session == null)
+                return Result<Guid>.FailureResult("NOT_FOUND", "Session not found");
+            request.TutorId = session.TutorId;
+        }
 
         // Check if already reviewed
         var existingReview = await _reviewRepository.FirstOrDefaultAsync(
