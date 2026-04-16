@@ -122,29 +122,50 @@ public class AdminPayoutsController : ControllerBase
         if (!string.IsNullOrEmpty(status) && Enum.TryParse<PayoutStatus>(status, out var ps))
             query = query.Where(p => p.Status == ps);
 
-        var payouts = await query
+        // Materialize from DB first (cannot call _encryptionService inside EF Core LINQ projection)
+        var rawPayouts = await query
             .OrderByDescending(p => p.RequestedAt)
             .Select(p => new
             {
                 p.Id,
                 p.TutorId,
-                TutorName  = p.Tutor.FirstName + " " + p.Tutor.LastName,
-                TutorEmail = p.Tutor.Email,
+                TutorFirstName = p.Tutor.FirstName,
+                TutorLastName  = p.Tutor.LastName,
+                TutorEmail     = p.Tutor.Email,
                 p.Amount,
-                Status     = p.Status.ToString(),
+                Status         = p.Status.ToString(),
                 p.RequestedAt,
                 p.ProcessedAt,
                 p.AdminNotes,
                 p.TransactionReference,
-                BankAccount = p.BankAccount != null ? new
-                {
-                    p.BankAccount.AccountHolderName,
-                    p.BankAccount.BankName,
-                    p.BankAccount.IFSCCode,
-                    AccountNumber = _encryptionService.Decrypt(p.BankAccount.AccountNumber)
-                } : null
+                BankAccountHolderName = p.BankAccount != null ? p.BankAccount.AccountHolderName : null,
+                BankName              = p.BankAccount != null ? p.BankAccount.BankName : null,
+                IfscCode              = p.BankAccount != null ? p.BankAccount.IFSCCode : null,
+                EncryptedAccountNumber = p.BankAccount != null ? p.BankAccount.AccountNumber : null,
             })
             .ToListAsync();
+
+        // Decrypt account numbers in-memory
+        var payouts = rawPayouts.Select(p => new
+        {
+            p.Id,
+            p.TutorId,
+            TutorName  = $"{p.TutorFirstName} {p.TutorLastName}".Trim(),
+            p.TutorEmail,
+            p.Amount,
+            p.Status,
+            p.RequestedAt,
+            p.ProcessedAt,
+            p.AdminNotes,
+            p.TransactionReference,
+            BankAccount = p.EncryptedAccountNumber != null ? new
+            {
+                AccountHolderName = p.BankAccountHolderName,
+                BankName          = p.BankName,
+                IfscCode          = p.IfscCode,
+                AccountNumber     = _encryptionService.Decrypt(p.EncryptedAccountNumber)
+            } : (object?)null
+        }).ToList();
 
         return Ok(new { data = payouts, total = payouts.Count });
     }
@@ -176,10 +197,10 @@ public class AdminPayoutsController : ControllerBase
                 AccountHolderName = p.BankAccount.AccountHolderName,
                 AccountNumber = _encryptionService.Decrypt(p.BankAccount.AccountNumber),
                 BankName = p.BankAccount.BankName,
-                IFSCCode = p.BankAccount.IFSCCode,
+                IfscCode = p.BankAccount.IFSCCode,
                 BranchName = p.BankAccount.BranchName,
                 AccountType = p.BankAccount.AccountType.ToString(),
-            } : new BankAccountDetailsDto { AccountHolderName = "N/A", BankName = "N/A", IFSCCode = "N/A" },
+            } : new BankAccountDetailsDto { AccountHolderName = "N/A", BankName = "N/A", IfscCode = "N/A" },
             EarningsHistory = _context.TutorEarnings
                 .Where(e => e.TutorId == p.TutorId)
                 .OrderByDescending(e => e.CreatedAt)
@@ -187,7 +208,7 @@ public class AdminPayoutsController : ControllerBase
                 .Select(e => new EarningSummaryDto
                 {
                     Amount = e.Amount,
-                    NetAmount = e.NetAmount,
+                    NetAmount = e.Amount - e.CommissionAmount, // NetAmount is computed, use inline arithmetic
                     Status = e.Status.ToString(),
                     CreatedAt = e.CreatedAt,
                 })
@@ -366,7 +387,7 @@ public class BankAccountDetailsDto
     public string AccountHolderName { get; set; } = string.Empty;
     public string AccountNumber { get; set; } = string.Empty;
     public string BankName { get; set; } = string.Empty;
-    public string IFSCCode { get; set; } = string.Empty;
+    public string IfscCode { get; set; } = string.Empty;
     public string? BranchName { get; set; }
     public string AccountType { get; set; } = string.Empty;
 }
