@@ -1079,18 +1079,20 @@ public static class DbInitializer
                     c2.CommandText = @"
                         CREATE TABLE IF NOT EXISTS BankAccounts (
                             Id TEXT NOT NULL PRIMARY KEY,
-                            TutorId TEXT NOT NULL,
+                            UserId TEXT NOT NULL,
                             AccountHolderName TEXT NOT NULL DEFAULT '',
                             AccountNumber TEXT NOT NULL DEFAULT '',
                             BankName TEXT NOT NULL DEFAULT '',
-                            BranchName TEXT NULL,
                             IFSCCode TEXT NOT NULL DEFAULT '',
+                            BranchName TEXT NULL,
                             AccountType TEXT NOT NULL DEFAULT 'Savings',
-                            IsDefault INTEGER NOT NULL DEFAULT 0,
                             IsVerified INTEGER NOT NULL DEFAULT 0,
+                            VerifiedAt TEXT NULL,
+                            IsPrimary INTEGER NOT NULL DEFAULT 0,
+                            IsDefault INTEGER NOT NULL DEFAULT 0,
                             CreatedAt TEXT NOT NULL,
                             UpdatedAt TEXT NOT NULL,
-                            FOREIGN KEY (TutorId) REFERENCES Users(Id) ON DELETE CASCADE
+                            FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE
                         )";
                     c2.ExecuteNonQuery();
                 }
