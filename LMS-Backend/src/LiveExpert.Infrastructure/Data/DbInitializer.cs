@@ -996,6 +996,23 @@ public static class DbInitializer
                     }
                 }
                 if (!sbPointsDiscount) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE SessionBookings ADD COLUMN PointsDiscount TEXT NOT NULL DEFAULT '0'"; c2.ExecuteNonQuery(); }
+
+                // ── Ensure SessionBookings has questionnaire columns ──────────────────
+                checkCmd.CommandText = "PRAGMA table_info(SessionBookings)";
+                bool sbGoals = false, sbCurrentLevel = false, sbTopics = false;
+                using (var sbQReader = checkCmd.ExecuteReader())
+                {
+                    while (sbQReader.Read())
+                    {
+                        var col = sbQReader["name"].ToString();
+                        if (col == "Goals") sbGoals = true;
+                        if (col == "CurrentLevel") sbCurrentLevel = true;
+                        if (col == "Topics") sbTopics = true;
+                    }
+                }
+                if (!sbGoals) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE SessionBookings ADD COLUMN Goals TEXT NULL"; c2.ExecuteNonQuery(); }
+                if (!sbCurrentLevel) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE SessionBookings ADD COLUMN CurrentLevel TEXT NULL"; c2.ExecuteNonQuery(); }
+                if (!sbTopics) { using var c2 = connection.CreateCommand(); c2.CommandText = "ALTER TABLE SessionBookings ADD COLUMN Topics TEXT NULL"; c2.ExecuteNonQuery(); }
             }
         }
         catch (Exception ex)

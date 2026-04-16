@@ -217,6 +217,7 @@ const UserManagement = () => {
                           <button
                             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                             onClick={() => handleToggleStatus(user)}
+                            title={user.isActive ? 'Deactivate user' : 'Activate user'}
                           >
                             {user.isActive ? (
                               <UserX className="w-4 h-4 text-red-600" />
@@ -227,6 +228,7 @@ const UserManagement = () => {
                           <button
                             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                             onClick={() => handleDeleteUser(user.id)}
+                            title="Delete user"
                           >
                             <Trash2 className="w-4 h-4 text-red-600" />
                           </button>

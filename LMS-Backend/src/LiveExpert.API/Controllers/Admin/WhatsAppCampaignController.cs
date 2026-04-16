@@ -4,7 +4,6 @@ using LiveExpert.Domain.Entities;
 using LiveExpert.Domain.Enums;
 using LiveExpert.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,7 +17,6 @@ namespace LiveExpert.API.Controllers.Admin;
 [Route("api/admin/campaigns")]
 [ApiController]
 [Authorize(Roles = "Admin")]
-[EnableCors("AllowAllDev")]
 public class WhatsAppCampaignController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
